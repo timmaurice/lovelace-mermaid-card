@@ -234,7 +234,8 @@ export class MermaidCard extends LitElement {
   private _measure(): void {
     const svg = this._diagram?.querySelector('svg');
     // maxWidth is the natural width sizeDiagram set; a scrolling diagram sits at its smaller minWidth.
-    this._shrunk = Boolean(svg && svg.getBoundingClientRect().width < parseFloat(svg.style.maxWidth) - 1);
+    // A few pixels short is not worth a bigger view: a Gantt chart is drawn to the card's width.
+    this._shrunk = Boolean(svg && svg.getBoundingClientRect().width < parseFloat(svg.style.maxWidth) - 8);
   }
 
   private _enlarge(): void {

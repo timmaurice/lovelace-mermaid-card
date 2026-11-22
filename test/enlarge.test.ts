@@ -57,6 +57,15 @@ describe('enlarged view', () => {
     expect(dialog.querySelector('.enlarged svg')).toBeNull();
   });
 
+  it('offers no enlarged view for a diagram only a few pixels short of its natural size', async () => {
+    const card = await mount();
+    const svg = card.shadowRoot!.querySelector('.diagram svg')!;
+    svg.getBoundingClientRect = () => ({ width: 798 }) as DOMRect; // jsdom has no layout; maxWidth is 800px
+    (card as unknown as { _measure(): void })._measure(); // as a resize does
+    await card.updateComplete;
+    expect(card.shadowRoot!.querySelector('.enlarge')).toBeNull();
+  });
+
   it('offers no enlarged view for a diagram shown at its natural size', async () => {
     render.mockResolvedValueOnce({ svg: '<svg><g class="node"></g></svg>' }); // no viewBox, so no maxWidth
     const card = await mount();
