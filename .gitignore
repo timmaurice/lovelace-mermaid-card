@@ -1,0 +1,8 @@
+/node_modules
+# Build output — built fresh by the release workflow and shipped as a release asset
+dist/
+.DS_Store
+CLAUDE.md
+GEMINI.md
+/test-env/config/*
+!/test-env/config/configuration.yaml

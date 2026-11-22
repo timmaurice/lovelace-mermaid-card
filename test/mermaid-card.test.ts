@@ -1,0 +1,102 @@
+import { describe, expect, it, vi } from 'vitest';
+import { bindNodes, stateColor } from '../src/entities';
+import type { HassEntity, HomeAssistant } from '../src/types';
+
+const render = vi.fn(async () => ({
+  svg: '<svg><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g><g class="node" id="mermaid-card-1-flowchart-B-0"><rect></rect></g></svg>',
+}));
+vi.mock('../src/mermaid', () => ({ loadMermaid: async () => ({ initialize: vi.fn(), render }) }));
+
+const { MermaidCard } = await import('../src/mermaid-card');
+
+const entity = (entity_id: string, state: string): HassEntity => ({ entity_id, state, attributes: {} });
+
+function makeHass(states: Record<string, HassEntity>, subscribeMessage = vi.fn()): HomeAssistant {
+  return { states, themes: { darkMode: false }, connection: { subscribeMessage } } as HomeAssistant;
+}
+
+describe('stateColor', () => {
+  it('maps states to Home Assistant state colours', () => {
+    expect(stateColor(entity('light.a', 'on'))).toContain('--state-light-active-color');
+    expect(stateColor(entity('light.a', 'off'))).toContain('--state-light-inactive-color');
+    expect(stateColor(entity('light.a', 'unavailable'))).toContain('--state-unavailable-color');
+    expect(stateColor(undefined)).toContain('--state-unavailable-color');
+    expect(stateColor(entity('sensor.t', '21.5'))).toBeUndefined();
+  });
+});
+
+describe('bindNodes', () => {
+  it('colours bound nodes, leaves others alone and opens more-info on click and Enter', () => {
+    const root = document.createElement('div');
+    root.innerHTML =
+      '<svg><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g><g class="node" id="mermaid-card-1-flowchart-B-0"><rect></rect></g></svg>';
+    const onTap = vi.fn();
+    bindNodes(root, { A: 'light.a' }, { 'light.a': entity('light.a', 'on') }, onTap);
+
+    const [a, b] = root.querySelectorAll<SVGGElement>('.node');
+    expect(a.querySelector('rect')!.style.getPropertyValue('fill')).toContain('--state-light-active-color');
+    expect(b.querySelector('rect')!.style.getPropertyValue('fill')).toBe('');
+    a.dispatchEvent(new MouseEvent('click'));
+    a.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(onTap).toHaveBeenCalledTimes(2);
+    expect(onTap).toHaveBeenCalledWith('light.a');
+  });
+});
+
+describe('MermaidCard', () => {
+  it('rejects a config without content', () => {
+    expect(() => new MermaidCard().setConfig({ type: 'custom:mermaid-card' } as never)).toThrow(/content/);
+  });
+
+  it('renders plain content without a template subscription and binds nodes', async () => {
+    const subscribe = vi.fn();
+    const card = new MermaidCard();
+    card.setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR\n A --> B', entities: { A: 'light.a' } });
+    card.hass = makeHass({ 'light.a': entity('light.a', 'off') }, subscribe);
+    document.body.append(card);
+    await vi.waitFor(() => expect(card.shadowRoot!.querySelector('.node rect')).not.toBeNull());
+
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(render).toHaveBeenLastCalledWith(expect.any(String), 'flowchart LR\n A --> B');
+    const rect = () => card.shadowRoot!.querySelector<SVGRectElement>('[id$="-flowchart-A-0"] rect')!;
+    expect(rect().style.getPropertyValue('fill')).toContain('inactive');
+
+    // A state change recolours without rendering the diagram again.
+    const renders = render.mock.calls.length;
+    card.hass = makeHass({ 'light.a': entity('light.a', 'on') }, subscribe);
+    await card.updateComplete;
+    expect(rect().style.getPropertyValue('fill')).toContain('active-color');
+    expect(rect().style.getPropertyValue('fill')).not.toContain('inactive');
+    expect(render.mock.calls.length).toBe(renders);
+    card.remove();
+  });
+
+  it('renders templated content through render_template and unsubscribes on removal', async () => {
+    const unsubscribe = vi.fn(async () => undefined);
+    let push: (message: unknown) => void = () => undefined;
+    const subscribe = vi.fn(async (callback: (message: unknown) => void) => {
+      push = callback;
+      return unsubscribe;
+    });
+    const card = new MermaidCard();
+    card.setConfig({ type: 'custom:mermaid-card', content: "flowchart LR\n A[{{ states('sensor.t') }}]" });
+    card.hass = makeHass({}, subscribe);
+    document.body.append(card);
+    await card.updateComplete;
+
+    expect(subscribe).toHaveBeenCalledWith(expect.any(Function), {
+      type: 'render_template',
+      template: "flowchart LR\n A[{{ states('sensor.t') }}]",
+      report_errors: true,
+    });
+    push({ result: 'flowchart LR\n A[21.5]' });
+    await vi.waitFor(() => expect(render).toHaveBeenLastCalledWith(expect.any(String), 'flowchart LR\n A[21.5]'));
+
+    push({ error: 'UndefinedError', level: 'ERROR' });
+    await card.updateComplete;
+    expect(card.shadowRoot!.querySelector('ha-alert')?.textContent).toContain('UndefinedError');
+
+    card.remove();
+    await vi.waitFor(() => expect(unsubscribe).toHaveBeenCalled());
+  });
+});

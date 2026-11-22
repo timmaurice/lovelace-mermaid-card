@@ -1,0 +1,7 @@
+default_config:
+
+lovelace:
+  resource_mode: yaml
+  resources:
+    - url: /local/dist/mermaid-card.js?v=2
+      type: module
