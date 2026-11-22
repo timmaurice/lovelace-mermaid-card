@@ -222,8 +222,8 @@ export class MermaidCard extends LitElement {
         securityLevel: 'strict', // diagrams may come from templates or an AI, so labels stay inert
         suppressErrorRendering: true,
         theme: 'base',
-        darkMode: Boolean(this.hass?.themes?.darkMode),
-        themeVariables: this._themeVariables(),
+        // Mermaid's themes read darkMode from the theme variables, not from the top level.
+        themeVariables: { ...this._themeVariables(), darkMode: Boolean(this.hass?.themes?.darkMode) },
       });
       const source = applyDirection(
         withHeader(text, this._config?.diagram_type, this._config?.direction),

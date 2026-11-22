@@ -5,8 +5,9 @@ import { TEMPLATE, type HassEntity, type HomeAssistant, type MermaidCardConfig }
 const render = vi.fn(async () => ({
   svg: '<svg><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g><g class="node" id="mermaid-card-1-flowchart-B-0"><rect></rect></g></svg>',
 }));
+const initialize = vi.fn();
 vi.mock('../src/mermaid', () => ({
-  loadMermaid: async () => ({ initialize: vi.fn(), render }),
+  loadMermaid: async () => ({ initialize, render }),
   listNodes: async () => ({
     nodes: [
       { id: 'A', label: 'A – Heat pump' },
@@ -152,6 +153,16 @@ describe('MermaidCard', () => {
     const vars = (new MermaidCard() as unknown as { _themeVariables(): Record<string, string> })._themeVariables();
     expect([vars.git0, vars.gitBranchLabel0, vars.git7]).toEqual(['#2196f3', '#ffffff', '#3f51b5']); // jsdom: fallbacks
     expect(vars.fillType1).toBe('#ff6f22');
+  });
+
+  it('tells Mermaid’s theme about dark mode, where it reads it', async () => {
+    const card = new MermaidCard();
+    card.setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR\n A --> B' });
+    card.hass = { ...makeHass({}), themes: { darkMode: true } };
+    document.body.append(card);
+    await vi.waitFor(() => expect(card.shadowRoot!.querySelector('svg')).not.toBeNull());
+    expect(initialize.mock.lastCall![0]).toMatchObject({ themeVariables: { darkMode: true } });
+    card.remove();
   });
 
   it('draws the diagram again in the colours of a new theme', async () => {
