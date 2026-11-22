@@ -58,7 +58,8 @@ export class MermaidCardEditor extends LitElement {
    */
   private _formData(config: MermaidCardConfig) {
     const { content, type, direction } = stripHeader(config.content ?? '');
-    const finalDirection = config.direction ?? direction;
+    // Top to bottom is Mermaid's own default, and suits the narrow cards dashboards mostly have.
+    const finalDirection = config.direction ?? direction ?? 'TB';
     return {
       ...config,
       content,
@@ -132,7 +133,7 @@ export class MermaidCardEditor extends LitElement {
     }
     if (!config.title) delete config.title;
     // A direction only means something for a flowchart; it would linger unseen otherwise.
-    if (!config.direction || config.diagram_type !== 'flowchart') delete config.direction;
+    if (!config.direction || config.direction === 'TB' || config.diagram_type !== 'flowchart') delete config.direction;
     if (config.diagram_type === 'flowchart') delete config.diagram_type; // the default
     if (config.scale === 100) delete config.scale; // the default
     this._emit(config);

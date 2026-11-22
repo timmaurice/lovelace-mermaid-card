@@ -212,6 +212,9 @@ describe('MermaidCardEditor', () => {
     change({ content: 'flowchart LR\n  A --> B', diagram_type: 'pie' });
     expect(emitted.at(-1)).toEqual({ type: 'custom:mermaid-card', content: '  A --> B', direction: 'LR' });
 
+    change({ content: 'A --> B', direction: 'TB' }); // top to bottom is the default
+    expect(emitted.at(-1)).toEqual({ type: 'custom:mermaid-card', content: 'A --> B' });
+
     change({ diagram_type: 'sequenceDiagram', direction: 'LR' }); // a direction means nothing there
     expect(emitted.at(-1)).toEqual({
       type: 'custom:mermaid-card',

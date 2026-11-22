@@ -20,7 +20,7 @@ The card has a visual editor. Pick the **Diagram type** from a dropdown; switchi
 | `diagram_type` | string | no       | Mermaid diagram type when `content` has no first line naming one: `flowchart` (default), `sequenceDiagram`, `stateDiagram-v2`, `pie`, …           |
 | `title`        | string | no       | Card header.                                                                                                                                      |
 | `entities`     | map    | no       | Node id → entity id. Works for flowchart, state and class diagrams.                                                                               |
-| `direction`    | string | no       | Overrides a flowchart's direction: `TB`, `TD`, `BT`, `LR` or `RL`. Handy when the same diagram sits in a narrow card.                             |
+| `direction`    | string | no       | A flowchart's direction: `TB` (top to bottom, the default), `BT`, `LR` or `RL`. Overrides a direction in the content's first line.                |
 | `scale`        | number | no       | Size in percent of the diagram's natural size, e.g. `70`. Default `100` fits the diagram to the card.                                             |
 
 ```yaml
