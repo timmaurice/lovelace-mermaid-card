@@ -1,15 +1,65 @@
 # Mermaid Card
 
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg?style=flat-square)](https://hacs.xyz/docs/faq/custom_repositories/)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/timmaurice/lovelace-mermaid-card?style=flat-square)
+[![GH-downloads](https://img.shields.io/github/downloads/timmaurice/lovelace-mermaid-card/total?style=flat-square)](https://github.com/timmaurice/lovelace-mermaid-card/releases)
 [![GH-last-commit](https://img.shields.io/github/last-commit/timmaurice/lovelace-mermaid-card.svg?style=flat-square)](https://github.com/timmaurice/lovelace-mermaid-card/commits/main)
+[![GH-code-size](https://img.shields.io/github/languages/code-size/timmaurice/lovelace-mermaid-card.svg?style=flat-square)](https://github.com/timmaurice/lovelace-mermaid-card)
 ![GitHub](https://img.shields.io/github/license/timmaurice/lovelace-mermaid-card?style=flat-square)
 
 A Home Assistant Lovelace card that renders [Mermaid](https://mermaid.js.org/) diagrams — flowcharts, state, sequence, class, Gantt and more — styled with your Home Assistant theme and kept live with your entity states.
 
-- **Live values:** the diagram source is a Home Assistant template, so labels can show states.
+<img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/screenshot.png" alt="Mermaid Card Screenshot" width="500">
+
+## Features
+
+### Live diagrams
+
+- **Live values:** the diagram source is a Home Assistant template, so labels can show states — or the whole diagram can be [built from entities](#diagrams-built-from-entities).
 - **Bound nodes:** map a node to an entity and it is coloured by that entity's state; tapping it opens more-info, or runs the action you choose.
-- **Live flows:** map an edge to an entity and it animates while that entity is active.
-- **AI friendly:** any Mermaid an assistant writes can go straight into `content` (or into a sensor attribute the template reads).
+- **Live flows:** map an edge to an entity and it animates in the entity's colour while that entity is active, at the speed the diagram gives it.
+- **Every diagram type:** flowchart, sequence, state, class, entity relationship, Gantt, pie, mind map, timeline, journey and the rest of Mermaid, in your theme's colours and dark mode.
+- **Wide diagrams:** a diagram shrinks to fit the card and opens at full size in a dialog when it does not fit.
+
+### Visual editor
+
+- Pick the diagram type and start from an example; pasted Mermaid with a header line is understood.
+- Bind nodes and edges from a list read from your diagram, with the matching entity suggested.
+- Add an entity as a new node, with its name and live state, in one step.
+- Mermaid's parse errors show right at the diagram field.
+
+### AI friendly
+
+Any Mermaid an assistant writes can go straight into `content` (or into a sensor attribute the template reads).
+
+## Localization
+
+The editor is available in English and German. Contributions of further languages are welcome: add a file to `src/translation/` and import it in `src/localize.ts`.
+
+## Installation
+
+### HACS (Custom repository)
+
+Mermaid Card is not in the default HACS catalog yet. Add it as a custom repository (type **Dashboard**); the button opens HACS with the repository filled in:
+
+<a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=timmaurice&repository=lovelace-mermaid-card&category=plugin" target="_blank" rel="noreferrer noopener"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Open your Home Assistant instance and open a repository inside the Home Assistant Community Store." /></a>
+
+Install **Mermaid Card** and reload the browser.
+
+<details>
+<summary>Manual Installation</summary>
+
+1.  Download the `mermaid-card.js` file from the latest release.
+2.  Place it in your `config/www` directory.
+3.  Add the resource reference to your Lovelace configuration under `Settings` -> `Dashboards` -> `...` -> `Resources`.
+    - URL: `/local/mermaid-card.js`
+    - Resource Type: `JavaScript Module`
+
+You can now add the card to your dashboard.
+
+</details>
+
+Mermaid itself is bundled into the card (about 1.6 MB compressed) but only run when a diagram is shown.
 
 ## Configuration
 
@@ -57,17 +107,28 @@ entities:
 
 A diagram shrinks to fit the card down to three quarters of its natural size; beyond that it scrolls sideways, so the text stays readable. For a narrow card, `direction: TD` usually fits better than a wide `LR` flowchart. When a diagram does not fit, a button in the card's corner opens it at full size in a dialog, where bound nodes still work.
 
+### Diagrams built from entities
+
+The whole diagram can come from a template. This Gantt chart shows every switch that is on, from the moment it was switched on until now; it grows each minute and shows a marker when nothing runs:
+
+```yaml
+type: custom:mermaid-card
+title: Running now
+diagram_type: gantt
+content: |
+  dateFormat HH:mm
+  axisFormat %H:%M
+  section Running
+  {%- for e in states.switch | selectattr('state', 'eq', 'on') %}
+  {{ e.name | replace(':', ' ') }} :{{ as_local(e.last_changed).strftime('%H:%M') }}, {{ [1, ((now() - e.last_changed).total_seconds() / 60) | round(0, 'ceil') | int] | max }}m
+  {%- else %}
+  Nothing running :milestone, {{ now().strftime('%H:%M') }}, 0m
+  {%- endfor %}
+```
+
+Narrow the loop to what you want to see: `expand(label_entities('laundry'))` or `expand('switch.washer', 'switch.dryer')` in place of `states.switch`. A colon in a task name ends it in Mermaid, hence the `replace`.
+
 Mermaid's hexagon shape `A{{text}}` collides with template syntax. Wrap such a diagram in `{% raw %}…{% endraw %}` or write the braces as `{{ '{{' }}` and `{{ '}}' }}`.
-
-## Installation
-
-Add this repository to HACS as a custom repository (category: Dashboard), install **Mermaid Card** and reload the browser.
-
-Mermaid itself is bundled into the card (about 1.6 MB compressed) but only run when a diagram is shown.
-
-## Localization
-
-The editor is available in English and German. Contributions of further languages are welcome: add a file to `src/translation/` and import it in `src/localize.ts`.
 
 ## Development
 
