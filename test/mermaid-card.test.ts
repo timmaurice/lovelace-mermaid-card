@@ -7,7 +7,7 @@ const render = vi.fn(async () => ({
 }));
 vi.mock('../src/mermaid', () => ({ loadMermaid: async () => ({ initialize: vi.fn(), render }) }));
 
-const { MermaidCard } = await import('../src/mermaid-card');
+const { MermaidCard, applyDirection, limitShrinking } = await import('../src/mermaid-card');
 
 const entity = (entity_id: string, state: string): HassEntity => ({ entity_id, state, attributes: {} });
 
@@ -35,6 +35,7 @@ describe('bindNodes', () => {
 
     const [a, b] = root.querySelectorAll<SVGGElement>('.node');
     expect(a.querySelector('rect')!.style.getPropertyValue('fill')).toContain('--state-light-active-color');
+    expect(a.querySelector('rect')!.style.getPropertyValue('stroke')).toContain('--state-light-active-color');
     expect(b.querySelector('rect')!.style.getPropertyValue('fill')).toBe('');
     a.dispatchEvent(new MouseEvent('click'));
     a.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
@@ -98,5 +99,41 @@ describe('MermaidCard', () => {
 
     card.remove();
     await vi.waitFor(() => expect(unsubscribe).toHaveBeenCalled());
+  });
+});
+
+describe('applyDirection', () => {
+  it('overrides, adds or keeps the flowchart direction', () => {
+    expect(applyDirection('flowchart LR\n  A --> B', 'TD')).toBe('flowchart TD\n  A --> B');
+    expect(applyDirection('graph LR;\n  A --> B', 'TD')).toBe('graph TD;\n  A --> B');
+    expect(applyDirection('---\ntitle: x\n---\nflowchart\n  A --> B', 'TB')).toBe(
+      '---\ntitle: x\n---\nflowchart TB\n  A --> B',
+    );
+    expect(applyDirection('flowchart LR\n  A --> B', undefined)).toBe('flowchart LR\n  A --> B');
+    expect(applyDirection('sequenceDiagram\n  A->>B: hi', 'TD')).toBe('sequenceDiagram\n  A->>B: hi');
+  });
+
+  it('rejects an unknown direction', () => {
+    expect(() =>
+      new MermaidCard().setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR', direction: 'up' as never }),
+    ).toThrow(/direction/);
+  });
+});
+
+describe('limitShrinking', () => {
+  it('keeps the diagram at three quarters of its natural width at least', () => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '-8 -8 800 200');
+    limitShrinking(svg);
+    expect(svg.style.minWidth).toBe('600px');
+    limitShrinking(null); // no SVG, e.g. an empty render: nothing to do
+  });
+});
+
+describe('getConfigForm', () => {
+  it('offers every config option with a label', () => {
+    const form = MermaidCard.getConfigForm();
+    expect(form.schema.map((field) => field.name)).toEqual(['title', 'content', 'direction', 'entities']);
+    for (const field of form.schema) expect(form.computeLabel(field)).toBeTruthy();
   });
 });

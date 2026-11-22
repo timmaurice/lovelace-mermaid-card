@@ -19,4 +19,6 @@ export interface MermaidCardConfig {
   content: string;
   /** Mermaid node id → entity id. Bound nodes are coloured by state and open more-info. */
   entities?: Record<string, string>;
+  /** Overrides a flowchart's direction, e.g. TD for a narrow card. */
+  direction?: 'TB' | 'TD' | 'BT' | 'LR' | 'RL';
 }

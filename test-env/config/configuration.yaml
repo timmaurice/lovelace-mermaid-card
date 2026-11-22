@@ -3,5 +3,5 @@ default_config:
 lovelace:
   resource_mode: yaml
   resources:
-    - url: /local/dist/mermaid-card.js?v=2
+    - url: /local/dist/mermaid-card.js?v=5
       type: module

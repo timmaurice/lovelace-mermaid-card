@@ -35,8 +35,19 @@ export function bindNodes(
       for (const shape of node.querySelectorAll<SVGElement>(
         ':scope > rect, :scope > polygon, :scope > circle, :scope > ellipse, :scope > path, :scope > g > path, :scope > g > rect',
       )) {
-        if (color) shape.style.setProperty('fill', color, 'important');
-        else shape.style.removeProperty('fill');
+        // A tint, not a solid fill: the label keeps the theme's text colour, which a full
+        // amber or grey fill made unreadable in dark mode (same idea as the tile card's icon).
+        if (color) {
+          shape.style.setProperty(
+            'fill',
+            `color-mix(in srgb, ${color} 25%, var(--card-background-color, transparent))`,
+            'important',
+          );
+          shape.style.setProperty('stroke', color, 'important');
+        } else {
+          shape.style.removeProperty('fill');
+          shape.style.removeProperty('stroke');
+        }
       }
       node.style.cursor = 'pointer';
       node.setAttribute('role', 'button');

@@ -7,6 +7,56 @@ import type { HomeAssistant, MermaidCardConfig } from './types';
 const ELEMENT_NAME = 'mermaid-card';
 const TEMPLATE = /\{\{|\{%/;
 let renderCount = 0;
+const DIRECTIONS = ['TB', 'TD', 'BT', 'LR', 'RL'];
+// The first `flowchart`/`graph` header line, with its direction if it has one.
+const FLOWCHART_HEADER = /^([ \t]*(?:flowchart|graph)(?:-elk)?)(?:[ \t]+(?:TB|TD|BT|RL|LR))?([ \t]*;?[ \t]*)$/m;
+
+/** Sets a flowchart's direction; other diagram types are returned unchanged. */
+export function applyDirection(text: string, direction?: string): string {
+  return direction ? text.replace(FLOWCHART_HEADER, `$1 ${direction}$2`) : text;
+}
+
+const EDITOR_TEXT: Record<string, Record<string, { label: string; helper?: string }>> = {
+  en: {
+    title: { label: 'Title' },
+    content: { label: 'Diagram', helper: 'Mermaid source. Templates like {{ states(...) }} are rendered live.' },
+    direction: {
+      label: 'Flowchart direction',
+      helper: 'Overrides the direction in the diagram, e.g. TD for narrow cards.',
+    },
+    entities: {
+      label: 'Bound nodes',
+      helper: 'Node id: entity id, one per line. Coloured by state, tap opens more-info.',
+    },
+  },
+  de: {
+    title: { label: 'Titel' },
+    content: { label: 'Diagramm', helper: 'Mermaid-Quelltext. Templates wie {{ states(...) }} werden live gerendert.' },
+    direction: {
+      label: 'Flussrichtung',
+      helper: 'Überschreibt die Richtung im Diagramm, z. B. TD für schmale Karten.',
+    },
+    entities: {
+      label: 'Gebundene Knoten',
+      helper: 'Knoten-ID: Entity-ID, je Zeile eine. Färbung nach Zustand, Tippen öffnet Details.',
+    },
+  },
+};
+
+function editorText(name: string, kind: 'label' | 'helper'): string | undefined {
+  const hass = (document.querySelector('home-assistant') as unknown as { hass?: { language?: string } } | null)?.hass;
+  const language = hass?.language?.split('-')[0] ?? 'en';
+  return (EDITOR_TEXT[language] ?? EDITOR_TEXT.en)[name]?.[kind];
+}
+
+// Below this fraction of its natural size a diagram's text gets unreadable; it scrolls instead.
+const MIN_SCALE = 0.75;
+
+/** Lets Mermaid's SVG shrink to fit the card, but never below MIN_SCALE of its natural width. */
+export function limitShrinking(svg: SVGSVGElement | null): void {
+  const width = Number(svg?.getAttribute('viewBox')?.split(/[\s,]+/)[2]);
+  if (svg && width > 0) svg.style.minWidth = `${Math.round(width * MIN_SCALE)}px`;
+}
 
 type TemplateMessage = { result: string } | { error: string; level?: string };
 
@@ -21,6 +71,23 @@ export class MermaidCard extends LitElement {
   private _renderToken = 0;
   private _renderedKey?: string;
 
+  /** The visual editor, built by Home Assistant's own form renderer. */
+  public static getConfigForm() {
+    return {
+      schema: [
+        { name: 'title', selector: { text: {} } },
+        { name: 'content', required: true, selector: { template: {} } },
+        {
+          name: 'direction',
+          selector: { select: { mode: 'dropdown', options: DIRECTIONS.map((value) => ({ value, label: value })) } },
+        },
+        { name: 'entities', selector: { object: {} } },
+      ],
+      computeLabel: (schema: { name: string }) => editorText(schema.name, 'label'),
+      computeHelper: (schema: { name: string }) => editorText(schema.name, 'helper'),
+    };
+  }
+
   public static getStubConfig(): Partial<MermaidCardConfig> {
     return { content: 'flowchart LR\n  A[Home Assistant] --> B[Mermaid]' };
   }
@@ -31,6 +98,9 @@ export class MermaidCard extends LitElement {
     }
     if (config.entities !== undefined && (typeof config.entities !== 'object' || Array.isArray(config.entities))) {
       throw new Error('entities must map Mermaid node ids to entity ids');
+    }
+    if (config.direction !== undefined && !DIRECTIONS.includes(config.direction)) {
+      throw new Error(`direction must be one of ${DIRECTIONS.join(', ')}`);
     }
     this._unsubscribeTemplate();
     this._config = config;
@@ -102,12 +172,16 @@ export class MermaidCard extends LitElement {
         darkMode: Boolean(this.hass?.themes?.darkMode),
         themeVariables: this._themeVariables(),
       });
-      const { svg, bindFunctions } = await mermaid.render(`${ELEMENT_NAME}-${++renderCount}`, text);
+      const { svg, bindFunctions } = await mermaid.render(
+        `${ELEMENT_NAME}-${++renderCount}`,
+        applyDirection(text, this._config?.direction),
+      );
       if (token !== this._renderToken) return; // a newer render overtook this one
       await this.updateComplete;
       if (!this._diagram) return;
       this._error = undefined;
       this._diagram.innerHTML = svg;
+      limitShrinking(this._diagram.querySelector('svg'));
       bindFunctions?.(this._diagram);
       this._bind();
     } catch (error) {
@@ -168,14 +242,15 @@ export class MermaidCard extends LitElement {
       margin: 0 16px 16px;
     }
     .diagram {
-      display: flex;
-      justify-content: center;
       padding: 16px;
+      overflow-x: auto;
     }
     ha-card[header] .diagram {
       padding-top: 0;
     }
     .diagram svg {
+      display: block;
+      margin: 0 auto; /* not flex centring: that would cut off the left edge once it scrolls */
       max-width: 100%;
       height: auto;
     }
