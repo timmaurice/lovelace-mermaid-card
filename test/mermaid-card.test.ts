@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { bindNodes, isActive, stateColor } from '../src/entities';
-import type { HassEntity, HomeAssistant } from '../src/types';
+import { TEMPLATE, type HassEntity, type HomeAssistant } from '../src/types';
 
 const render = vi.fn(async () => ({
   svg: '<svg><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g><g class="node" id="mermaid-card-1-flowchart-B-0"><rect></rect></g></svg>',
@@ -161,6 +161,11 @@ describe('MermaidCard', () => {
       ),
     );
     card.remove();
+  });
+
+  it('treats a closed Jinja comment as a template, but not a rhombus starting with #', () => {
+    expect(TEMPLATE.test('A --> B\n{# heating loop #}')).toBe(true);
+    expect(TEMPLATE.test('A{#1 choice} --> B')).toBe(false);
   });
 
   it('renders templated content through render_template and unsubscribes on removal', async () => {

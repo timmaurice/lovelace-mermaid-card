@@ -4,7 +4,7 @@ import { DIAGRAM_TYPES, EXAMPLES, stripHeader, withHeader } from './header';
 import { localize } from './localize';
 import { DiagramNode, listNodes } from './mermaid';
 import { toBinding } from './entities';
-import type { HassEntity, HomeAssistant, MermaidCardConfig, NodeBinding } from './types';
+import { TEMPLATE, type HassEntity, type HomeAssistant, type MermaidCardConfig, type NodeBinding } from './types';
 
 export const EDITOR_ELEMENT_NAME = 'mermaid-card-editor';
 const MDI_DELETE = 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z';
@@ -142,9 +142,12 @@ export class MermaidCardEditor extends LitElement {
    * ids usually survive that. `exact` tells which: only exact text is worth a parse error.
    */
   private async _renderOnce(content: string): Promise<{ text: string; exact: boolean }> {
-    if (!/\{\{|\{%/.test(content)) return { text: content, exact: true };
+    if (!TEMPLATE.test(content)) return { text: content, exact: true };
     const blanked = {
-      text: content.replace(/\{\{[\s\S]*?\}\}/g, '…').replace(/\{%[\s\S]*?%\}/g, ''),
+      text: content
+        .replace(/\{\{[\s\S]*?\}\}/g, '…')
+        .replace(/\{%[\s\S]*?%\}/g, '')
+        .replace(/\{#[\s\S]*?#\}/g, ''),
       exact: false,
     };
     const connection = this.hass?.connection;

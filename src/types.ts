@@ -1,5 +1,11 @@
 export const DIRECTIONS = ['TB', 'TD', 'BT', 'LR', 'RL'] as const;
 
+/**
+ * Content Home Assistant must render first: an expression, a statement or a Jinja comment. A
+ * comment counts only when closed, so a rhombus like `A{#1 choice}` stays plain Mermaid.
+ */
+export const TEMPLATE = /\{\{|\{%|\{#[\s\S]*?#\}/;
+
 export interface HassEntity {
   entity_id: string;
   state: string;
