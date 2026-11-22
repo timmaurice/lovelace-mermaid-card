@@ -95,67 +95,102 @@ export function withHeader(content: string, type = 'flowchart', direction?: stri
 }
 
 /**
- * A small starting point per type, like Home Assistant's template editor offers. Only entities
- * every installation has (sun.sun) appear, so each example renders as it is.
+ * A small starting point per type, like Home Assistant's template editor offers. Each reads live
+ * what every installation has (the sun, the home zone, the states, the area registry), so it
+ * renders as it is and shows what a template can do in that diagram type.
  */
 export const EXAMPLES: Record<(typeof DIAGRAM_TYPES)[number], string> = {
-  flowchart: `  SUN(["Sun<br>{{ state_translated('sun.sun') }}"]) --> HOME[Home]
-  HOME --> DARK{Dark outside?}
-  DARK -->|yes| SCENE[Evening scene]
-  DARK -->|no| NOTHING[Nothing to do]`,
-  sequenceDiagram: `  participant S as Motion sensor
+  flowchart: `  SUN(["Sun<br>{{ state_translated('sun.sun') }}"]) --> DARK{Dark outside?}
+  DARK yes@-->|yes| SCENE[Evening scene]
+  DARK no@-->|no| NOTHING[Nothing to do]
+  {%- set dark = is_state('sun.sun', 'below_horizon') %}
+  {{ 'yes' if dark else 'no' }}@{ animation: slow }
+  class {{ 'SCENE' if dark else 'NOTHING' }} taken
+  classDef taken stroke:#ffc107,stroke-width:3px`,
+  sequenceDiagram: `  participant S as Sun
   participant HA as Home Assistant
-  participant L as Hall light
-  S->>HA: motion detected
-  HA->>L: turn on
-  Note over HA,L: off again after 3 minutes
-  HA->>L: turn off`,
-  'stateDiagram-v2': `  [*] --> Docked
-  Docked --> Cleaning: schedule
-  Cleaning --> Returning: done
-  Returning --> Docked
-  Cleaning --> Error: stuck
-  Error --> Docked: reset`,
-  classDiagram: `  class Room {
-    +name
-    +temperature
+  participant L as Lights
+  S->>HA: {{ state_translated('sun.sun') }}, {{ state_attr('sun.sun', 'elevation') }}° high
+  Note over S,HA: next sunset {{ as_timestamp(state_attr('sun.sun', 'next_setting')) | timestamp_custom('%H:%M') }}
+  HA->>L: {{ 'turn on' if is_state('sun.sun', 'below_horizon') else 'stay off' }}`,
+  'stateDiagram-v2': `  state "Day" as above_horizon
+  state "Night" as below_horizon
+  [*] --> {{ states('sun.sun') }}
+  above_horizon --> below_horizon: sunset {{ as_timestamp(state_attr('sun.sun', 'next_setting')) | timestamp_custom('%H:%M') }}
+  below_horizon --> above_horizon: sunrise {{ as_timestamp(state_attr('sun.sun', 'next_rising')) | timestamp_custom('%H:%M') }}
+  class {{ states('sun.sun') }} current
+  classDef current stroke:#ffc107,stroke-width:3px`,
+  classDiagram: `  class Home {
+    +people home {{ states('zone.home') }}
+    +areas {{ areas() | count }}
+    +entities {{ states | count }}
   }
-  class Light {
-    +brightness
-    +turn_on()
-    +turn_off()
+  class Sun {
+    +state {{ states('sun.sun') }}
+    +elevation {{ state_attr('sun.sun', 'elevation') }}°
+    +azimuth {{ state_attr('sun.sun', 'azimuth') }}°
   }
-  Room "1" --> "*" Light`,
-  erDiagram: `  AREA ||--o{ DEVICE : contains
-  DEVICE ||--|{ ENTITY : provides
-  ENTITY ||--o{ AUTOMATION : triggers`,
+  Home --> Sun : lights by`,
+  erDiagram: `  direction LR
+  FLOOR ||--o{ AREA : groups
+  AREA ||--o{ ENTITY : contains
+  ENTITY ||--o{ AUTOMATION : triggers
+  FLOOR {
+    int count "{{ floors() | count }} here"
+  }
+  AREA {
+    int count "{{ areas() | count }} here"
+  }
+  ENTITY {
+    int count "{{ states | count }} here"
+  }
+  AUTOMATION {
+    int count "{{ states.automation | count }} here"
+  }`,
   gantt: `  dateFormat HH:mm
   axisFormat %H:%M
-  section Laundry
-  Wash :wash, 08:00, 90m
-  Dry  :after wash, 60m
-  section Dishes
-  Dishwasher :10:00, 120m`,
-  pie: `  title Energy today
-  "Heating" : 42
-  "Kitchen" : 18
-  "Office" : 25`,
-  mindmap: `  root((Home))
-    Ground floor
-      Kitchen
-      Living room
-    First floor
-      Bedroom
-      Bathroom`,
+  todayMarker off
+  {%- set sunrise = as_timestamp(state_attr('sun.sun', 'next_rising')) | timestamp_custom('%H:%M') %}
+  {%- set sunset = as_timestamp(state_attr('sun.sun', 'next_setting')) | timestamp_custom('%H:%M') %}
+  section Sun
+  Night :00:00, {{ sunrise }}
+  Day :{{ sunrise }}, {{ sunset }}
+  Evening :{{ sunset }}, 23:59
+  section Now
+  {{ now().strftime('%H.%M') }} :milestone, {{ now().strftime('%H:%M') }}, 0m`,
+  pie: `  title Entities by domain
+  {%- set ns = namespace(rows=[]) %}
+  {%- for domain, items in states | groupby('domain') %}{% set ns.rows = ns.rows + [(items | count, domain)] %}{% endfor %}
+  {%- set rows = ns.rows | sort(reverse=true) %}
+  {%- for count, domain in rows[:5] %}
+  "{{ domain }}" : {{ count }}
+  {%- endfor %}
+  {%- if rows | count > 5 %}
+  "other" : {{ rows[5:] | map(attribute='0') | sum }}
+  {%- endif %}`,
+  mindmap: `  root(({{ state_attr('zone.home', 'friendly_name') or 'Home' }}))
+  {%- for f in floors() %}
+    f_{{ f }}("{{ floor_name(f) | replace('"', '') }}")
+  {%- for a in floor_areas(f) %}
+      a_{{ a }}["{{ area_name(a) | replace('"', '') }}"]
+  {%- endfor %}
+  {%- endfor %}
+  {%- for a in areas() if not floor_id(a) %}
+    a_{{ a }}["{{ area_name(a) | replace('"', '') }}"]
+  {%- endfor %}`,
   timeline: `  title Today
-  Morning : Wake-up light : Coffee machine on
-  Daytime : Away mode
-  Evening : Welcome home
-  Night : Night mode`,
+  {%- set events = [
+    (as_timestamp(now()), 'Now', 'Home Assistant runs'),
+    (as_timestamp(state_attr('sun.sun', 'next_rising')), 'Sunrise', 'Blinds up'),
+    (as_timestamp(state_attr('sun.sun', 'next_setting')), 'Sunset', 'Evening scene'),
+  ] | sort %}
+  {%- for time, name, action in events %}
+  {{ time | timestamp_custom('%H.%M') }} {{ name }} : {{ action }}
+  {%- endfor %}`,
   journey: `  title Coming home
   section Arriving
-    Open the garage: 4: Me
-    Lights turn on: 5: Home Assistant
+    Someone is home: {{ 5 if states('zone.home') | int(0) > 0 else 2 }}: Home
+    Lights on if dark: {{ 5 if is_state('sun.sun', 'below_horizon') else 3 }}: Home Assistant
   section Evening
-    Heating ready: 5: Home Assistant`,
+    Sun down: {{ 5 if is_state('sun.sun', 'below_horizon') else 1 }}: Home Assistant`,
 };
