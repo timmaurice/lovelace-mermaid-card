@@ -102,6 +102,24 @@ describe('bindNodes', () => {
     expect(root.querySelector('path')!.classList.contains('edge-animation-fast')).toBe(false);
   });
 
+  it('binds an icon shape and draws its icon in the state colour', () => {
+    const root = document.createElement('div');
+    root.innerHTML =
+      '<svg><g class="icon-shape default" id="mermaid-card-1-flowchart-HP-0"><g class="label"><rect></rect></g><g style="color: #009ac7"><path></path></g></g></svg>';
+    const onAction = vi.fn();
+    bindNodes(root, { HP: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'on') }, onAction);
+    const node = root.querySelector<SVGGElement>('.icon-shape')!;
+    const icon = node.querySelector<SVGGElement>('g[style]')!;
+    expect(icon.style.color).toContain('--state-switch-active-color');
+    expect(node.querySelector('rect')!.getAttribute('style')).toBeNull(); // the label box keeps its look
+    node.dispatchEvent(new MouseEvent('click'));
+    expect(onAction).toHaveBeenCalledWith({ entity: 'switch.pump' }, 'tap');
+    bindNodes(root, { HP: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'unknown_state_x') }, onAction);
+    expect(icon.style.color).toContain('--state-switch-active-color'); // any other text counts as active
+    bindNodes(root, { HP: 'switch.pump' }, { 'switch.pump': entity('switch.pump', '21.5') }, onAction);
+    expect(icon.style.color).toBe('rgb(0, 154, 199)'); // a number keeps the diagram's own colour
+  });
+
   it('runs the hold action on a long press instead of the tap', () => {
     vi.useFakeTimers();
     const root = document.createElement('div');

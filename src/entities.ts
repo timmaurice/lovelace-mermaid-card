@@ -92,7 +92,8 @@ export function bindNodes(
   states: Record<string, HassEntity>,
   onAction: (binding: NodeBinding, action: 'tap' | 'hold') => void,
 ): void {
-  const nodes = [...root.querySelectorAll<SVGGElement>('.node')];
+  // Icon shapes (`A@{ icon: … }`) are nodes too, but Mermaid gives them their own class.
+  const nodes = [...root.querySelectorAll<SVGGElement>('.node, .icon-shape')];
   // Edges carry their id as data-id (clusters do too, but they are not paths).
   const edges = [...root.querySelectorAll<SVGPathElement>('path[data-id]')];
   for (const [nodeId, value] of Object.entries(bindings)) {
@@ -131,9 +132,13 @@ export function bindNodes(
     );
     for (const node of nodes.filter((candidate) => pattern.test(candidate.id))) {
       const color = stateColor(entity, binding.active_when);
-      for (const shape of node.querySelectorAll<SVGElement>(
-        ':scope > rect, :scope > polygon, :scope > circle, :scope > ellipse, :scope > path, :scope > g > path, :scope > g > rect',
-      )) {
+      // An icon shape has no body to tint, only its frame and label box: its icon takes the colour below.
+      const shapes = node.classList.contains('icon-shape')
+        ? []
+        : node.querySelectorAll<SVGElement>(
+            ':scope > rect, :scope > polygon, :scope > circle, :scope > ellipse, :scope > path, :scope > g > path, :scope > g > rect',
+          );
+      for (const shape of shapes) {
         // A tint, not a solid fill: the label keeps the theme's text colour, which a full
         // amber or grey fill made unreadable in dark mode (same idea as the tile card's icon).
         if (color) {
@@ -147,6 +152,11 @@ export function bindNodes(
           shape.style.removeProperty('fill');
           shape.style.removeProperty('stroke');
         }
+      }
+      // An icon draws in currentColor from an inline `color`: it takes the state colour, as a tile card's icon does.
+      for (const icon of node.querySelectorAll<SVGElement>('g[style*="color"]')) {
+        const own = (icon.dataset.ownColor ??= icon.style.color);
+        icon.style.color = color ?? own;
       }
       node.style.cursor = 'pointer';
       node.setAttribute('role', 'button');
