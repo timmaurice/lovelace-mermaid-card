@@ -1,5 +1,9 @@
 # Mermaid Card
 
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/timmaurice/lovelace-mermaid-card?style=flat-square)
+[![GH-last-commit](https://img.shields.io/github/last-commit/timmaurice/lovelace-mermaid-card.svg?style=flat-square)](https://github.com/timmaurice/lovelace-mermaid-card/commits/main)
+![GitHub](https://img.shields.io/github/license/timmaurice/lovelace-mermaid-card?style=flat-square)
+
 A Home Assistant Lovelace card that renders [Mermaid](https://mermaid.js.org/) diagrams — flowcharts, state, sequence, class, Gantt and more — styled with your Home Assistant theme and kept live with your entity states.
 
 - **Live values:** the diagram source is a Home Assistant template, so labels can show states.
@@ -7,6 +11,8 @@ A Home Assistant Lovelace card that renders [Mermaid](https://mermaid.js.org/) d
 - **AI friendly:** any Mermaid an assistant writes can go straight into `content` (or into a sensor attribute the template reads).
 
 ## Configuration
+
+The card has a visual editor. Under **Bound nodes** you pick a node from a list the editor reads from your diagram, and an entity for it.
 
 | Option      | Type   | Required | Description                                                                                                           |
 | ----------- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -36,3 +42,55 @@ Mermaid's hexagon shape `A{{text}}` collides with template syntax. Wrap such a d
 Add this repository to HACS as a custom repository (category: Dashboard), install **Mermaid Card** and reload the browser.
 
 Mermaid itself is bundled into the card (about 1.6 MB compressed) but only run when a diagram is shown.
+
+## Localization
+
+The editor is available in English and German. Contributions of further languages are welcome: add a file to `src/translation/` and import it in `src/localize.ts`.
+
+## Development
+
+<details>
+<summary>To contribute to the development, you'll need to set up a build environment.</summary>
+
+1.  **Clone the repository:**
+
+    ```bash
+    git clone https://github.com/timmaurice/lovelace-mermaid-card.git
+    cd lovelace-mermaid-card
+    ```
+
+2.  **Install dependencies:**
+
+    ```bash
+    npm install
+    ```
+
+3.  **Build the card** into `dist/mermaid-card.js`, or keep it rebuilding with `npm run watch`:
+
+    ```bash
+    npm run build
+    ```
+
+### Local Testing with Docker
+
+`docker compose up -d` starts Home Assistant at [http://localhost:8137](http://localhost:8137) with `dist/` mounted as `/config/www`, so the card is served as `/local/mermaid-card.js`. Its configuration persists in `test/ha-config`.
+
+### End-to-end tests
+
+The Playwright suite runs from a fresh clone with one command (Docker and Node required):
+
+```bash
+npm ci && npx playwright install chromium && npm run test:e2e
+```
+
+Global setup builds the card, starts the compose Home Assistant, onboards it through the API (user `admin` / `password`) and registers the bundle as a Lovelace resource. CI runs the same thing in `.github/workflows/e2e.yml`.
+
+</details>
+
+---
+
+For further assistance or to [report issues](https://github.com/timmaurice/lovelace-mermaid-card/issues), please visit the [GitHub repository](https://github.com/timmaurice/lovelace-mermaid-card).
+
+## ☕ Support My Work
+
+[<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="30" />](https://www.buymeacoffee.com/timmaurice)

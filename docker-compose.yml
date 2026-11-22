@@ -1,0 +1,12 @@
+services:
+  homeassistant:
+    container_name: ha-mermaid-card-test
+    image: homeassistant/home-assistant:2026.11.1
+    volumes:
+      - ./test/ha-config:/config
+      - ./dist:/config/www:ro
+    environment:
+      - TZ=Europe/Berlin
+    restart: unless-stopped
+    ports:
+      - '8137:8123'

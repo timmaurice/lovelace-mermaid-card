@@ -1,0 +1,15 @@
+{
+  "editor": {
+    "title": "Titel",
+    "content": "Diagramm",
+    "content_helper": "Mermaid-Quelltext. Templates wie {{ states(...) }} werden live gerendert.",
+    "direction": "Flussrichtung",
+    "direction_helper": "Überschreibt die Richtung im Diagramm, z. B. TD für schmale Karten.",
+    "bindings": "Gebundene Knoten",
+    "bindings_helper": "Gebundene Knoten werden nach dem Zustand ihrer Entität eingefärbt; Tippen öffnet die Details.",
+    "node": "Knoten",
+    "entity": "Entität",
+    "add_binding": "Knoten binden",
+    "remove_binding": "Entfernen"
+  }
+}

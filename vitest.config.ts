@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    exclude: ['**/node_modules/**', '**/dist/**'],
+    // The end-to-end specs are Playwright's, not Vitest's.
+    exclude: ['**/node_modules/**', '**/dist/**', 'test/e2e/**'],
   },
 });

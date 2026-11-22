@@ -1,3 +1,5 @@
+export const DIRECTIONS = ['TB', 'TD', 'BT', 'LR', 'RL'] as const;
+
 export interface HassEntity {
   entity_id: string;
   state: string;
@@ -5,6 +7,7 @@ export interface HassEntity {
 }
 
 export interface HomeAssistant {
+  language?: string;
   states: Record<string, HassEntity>;
   themes: { darkMode: boolean };
   connection: {
@@ -20,5 +23,5 @@ export interface MermaidCardConfig {
   /** Mermaid node id → entity id. Bound nodes are coloured by state and open more-info. */
   entities?: Record<string, string>;
   /** Overrides a flowchart's direction, e.g. TD for a narrow card. */
-  direction?: 'TB' | 'TD' | 'BT' | 'LR' | 'RL';
+  direction?: (typeof DIRECTIONS)[number];
 }

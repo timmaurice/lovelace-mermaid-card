@@ -1,0 +1,49 @@
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: 'npm'
+    # Look for `package.json` and `lock` files in the `root` directory
+    directory: '/'
+    # Check for updates every week
+    schedule:
+      interval: 'monthly'
+    cooldown:
+      default-days: 7
+    # Add a label to pull requests
+    labels:
+      - 'dependencies'
+    # TypeScript 7 is deliberately held back: `typescript-eslint` still declares
+    # `peer typescript: >=4.8.4 <6.1.0`, so a grouped bump that carries TypeScript 7 cannot be
+    # installed at all — `npm ci` aborts on the peer conflict and the whole group is stuck.
+    # Drop this once typescript-eslint supports it.
+    ignore:
+      - dependency-name: 'typescript'
+        update-types:
+          - 'version-update:semver-major'
+    # Group all npm dependencies into a single pull request
+    groups:
+      npm-dependencies:
+        patterns:
+          - '*'
+
+  # Keep the workflow actions current too. Without this entry Dependabot only
+  # looked at npm, and actions/checkout and actions/setup-node fell a major behind.
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'monthly'
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+
+  # The Home Assistant test image is pinned to a release in docker-compose.yml; this
+  # bumps the pin so the tests keep running against a current Home Assistant.
+  - package-ecosystem: 'docker-compose'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    cooldown:
+      default-days: 7

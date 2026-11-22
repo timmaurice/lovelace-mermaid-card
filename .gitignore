@@ -1,8 +1,18 @@
+# Dependencies
 /node_modules
+
 # Build output — built fresh by the release workflow and shipped as a release asset
 dist/
+
 .DS_Store
+
+# Local AI context
 CLAUDE.md
 GEMINI.md
-/test-env/config/*
-!/test-env/config/configuration.yaml
+
+# Home Assistant local test configuration
+/test/ha-config
+
+# Playwright
+test-results/
+playwright-report/

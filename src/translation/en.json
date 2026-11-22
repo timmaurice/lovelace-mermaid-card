@@ -1,0 +1,15 @@
+{
+  "editor": {
+    "title": "Title",
+    "content": "Diagram",
+    "content_helper": "Mermaid source. Templates like {{ states(...) }} are rendered live.",
+    "direction": "Flowchart direction",
+    "direction_helper": "Overrides the direction in the diagram, e.g. TD for narrow cards.",
+    "bindings": "Bound nodes",
+    "bindings_helper": "Bound nodes are coloured by their entity's state; tapping one opens its details.",
+    "node": "Node",
+    "entity": "Entity",
+    "add_binding": "Bind a node",
+    "remove_binding": "Remove"
+  }
+}

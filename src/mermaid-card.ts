@@ -2,51 +2,18 @@ import { LitElement, PropertyValues, css, html, nothing } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
 import { bindNodes } from './entities';
 import { loadMermaid } from './mermaid';
-import type { HomeAssistant, MermaidCardConfig } from './types';
+import { EDITOR_ELEMENT_NAME } from './editor';
+import { DIRECTIONS, type HomeAssistant, type MermaidCardConfig } from './types';
 
 const ELEMENT_NAME = 'mermaid-card';
 const TEMPLATE = /\{\{|\{%/;
 let renderCount = 0;
-const DIRECTIONS = ['TB', 'TD', 'BT', 'LR', 'RL'];
 // The first `flowchart`/`graph` header line, with its direction if it has one.
 const FLOWCHART_HEADER = /^([ \t]*(?:flowchart|graph)(?:-elk)?)(?:[ \t]+(?:TB|TD|BT|RL|LR))?([ \t]*;?[ \t]*)$/m;
 
 /** Sets a flowchart's direction; other diagram types are returned unchanged. */
 export function applyDirection(text: string, direction?: string): string {
   return direction ? text.replace(FLOWCHART_HEADER, `$1 ${direction}$2`) : text;
-}
-
-const EDITOR_TEXT: Record<string, Record<string, { label: string; helper?: string }>> = {
-  en: {
-    title: { label: 'Title' },
-    content: { label: 'Diagram', helper: 'Mermaid source. Templates like {{ states(...) }} are rendered live.' },
-    direction: {
-      label: 'Flowchart direction',
-      helper: 'Overrides the direction in the diagram, e.g. TD for narrow cards.',
-    },
-    entities: {
-      label: 'Bound nodes',
-      helper: 'Node id: entity id, one per line. Coloured by state, tap opens more-info.',
-    },
-  },
-  de: {
-    title: { label: 'Titel' },
-    content: { label: 'Diagramm', helper: 'Mermaid-Quelltext. Templates wie {{ states(...) }} werden live gerendert.' },
-    direction: {
-      label: 'Flussrichtung',
-      helper: 'Überschreibt die Richtung im Diagramm, z. B. TD für schmale Karten.',
-    },
-    entities: {
-      label: 'Gebundene Knoten',
-      helper: 'Knoten-ID: Entity-ID, je Zeile eine. Färbung nach Zustand, Tippen öffnet Details.',
-    },
-  },
-};
-
-function editorText(name: string, kind: 'label' | 'helper'): string | undefined {
-  const hass = (document.querySelector('home-assistant') as unknown as { hass?: { language?: string } } | null)?.hass;
-  const language = hass?.language?.split('-')[0] ?? 'en';
-  return (EDITOR_TEXT[language] ?? EDITOR_TEXT.en)[name]?.[kind];
 }
 
 // Below this fraction of its natural size a diagram's text gets unreadable; it scrolls instead.
@@ -71,21 +38,8 @@ export class MermaidCard extends LitElement {
   private _renderToken = 0;
   private _renderedKey?: string;
 
-  /** The visual editor, built by Home Assistant's own form renderer. */
-  public static getConfigForm() {
-    return {
-      schema: [
-        { name: 'title', selector: { text: {} } },
-        { name: 'content', required: true, selector: { template: {} } },
-        {
-          name: 'direction',
-          selector: { select: { mode: 'dropdown', options: DIRECTIONS.map((value) => ({ value, label: value })) } },
-        },
-        { name: 'entities', selector: { object: {} } },
-      ],
-      computeLabel: (schema: { name: string }) => editorText(schema.name, 'label'),
-      computeHelper: (schema: { name: string }) => editorText(schema.name, 'helper'),
-    };
+  public static getConfigElement(): HTMLElement {
+    return document.createElement(EDITOR_ELEMENT_NAME);
   }
 
   public static getStubConfig(): Partial<MermaidCardConfig> {

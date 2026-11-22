@@ -5,9 +5,17 @@ import type { HassEntity, HomeAssistant } from '../src/types';
 const render = vi.fn(async () => ({
   svg: '<svg><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g><g class="node" id="mermaid-card-1-flowchart-B-0"><rect></rect></g></svg>',
 }));
-vi.mock('../src/mermaid', () => ({ loadMermaid: async () => ({ initialize: vi.fn(), render }) }));
+vi.mock('../src/mermaid', () => ({
+  loadMermaid: async () => ({ initialize: vi.fn(), render }),
+  listNodes: async () => [
+    { id: 'A', label: 'A – Heat pump' },
+    { id: 'B', label: 'B – Boiler' },
+  ],
+}));
 
 const { MermaidCard, applyDirection, limitShrinking } = await import('../src/mermaid-card');
+const { MermaidCardEditor } = await import('../src/editor');
+const { localize } = await import('../src/localize');
 
 const entity = (entity_id: string, state: string): HassEntity => ({ entity_id, state, attributes: {} });
 
@@ -130,10 +138,49 @@ describe('limitShrinking', () => {
   });
 });
 
-describe('getConfigForm', () => {
-  it('offers every config option with a label', () => {
-    const form = MermaidCard.getConfigForm();
-    expect(form.schema.map((field) => field.name)).toEqual(['title', 'content', 'direction', 'entities']);
-    for (const field of form.schema) expect(form.computeLabel(field)).toBeTruthy();
+describe('MermaidCardEditor', () => {
+  type Rows = { node: string; entity: string }[];
+  const internals = (editor: InstanceType<typeof MermaidCardEditor>) =>
+    editor as unknown as { _rows: Rows; _nodes: unknown[]; _rowsChanged(rows: Rows): void };
+
+  it('keeps a half-filled row while writing only complete bindings to the config', () => {
+    const editor = new MermaidCardEditor();
+    const emitted: { entities?: Record<string, string> }[] = [];
+    editor.addEventListener('config-changed', (event) => emitted.push((event as CustomEvent).detail.config));
+    editor.setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR\n A --> B', entities: { A: 'light.a' } });
+    expect(internals(editor)._rows).toEqual([{ node: 'A', entity: 'light.a' }]);
+
+    internals(editor)._rowsChanged([...internals(editor)._rows, { node: 'B', entity: '' }]);
+    expect(emitted.at(-1)!.entities).toEqual({ A: 'light.a' });
+    editor.setConfig(emitted.at(-1) as never); // Home Assistant echoes the config back
+    expect(internals(editor)._rows).toHaveLength(2);
+
+    internals(editor)._rowsChanged([
+      { node: 'A', entity: 'light.a' },
+      { node: 'B', entity: 'switch.b' },
+    ]);
+    expect(emitted.at(-1)!.entities).toEqual({ A: 'light.a', B: 'switch.b' });
+    internals(editor)._rowsChanged([]);
+    expect(emitted.at(-1)!.entities).toBeUndefined();
+  });
+
+  it('offers the diagram nodes once the content was parsed', async () => {
+    vi.useFakeTimers();
+    const editor = new MermaidCardEditor();
+    editor.setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR\n A --> B' });
+    await vi.advanceTimersByTimeAsync(500);
+    vi.useRealTimers();
+    expect(internals(editor)._nodes).toEqual([
+      { id: 'A', label: 'A – Heat pump' },
+      { id: 'B', label: 'B – Boiler' },
+    ]);
+  });
+});
+
+describe('localize', () => {
+  it('uses the user language, then English, then the key', () => {
+    expect(localize({ language: 'de' }, 'editor.bindings')).toBe('Gebundene Knoten');
+    expect(localize({ language: 'fr' }, 'editor.bindings')).toBe('Bound nodes');
+    expect(localize(undefined, 'editor.nope')).toBe('editor.nope');
   });
 });
