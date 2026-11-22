@@ -58,6 +58,10 @@ entities:
 ```
 - `speed: auto` on an edge binding moves it faster the higher the entity's value (absolute; a negative value moves backwards), from slow near zero to full speed at `max` (default 10000) on a log scale. Set `max` in the sensor's unit: `8000` for W, `8` for kW. Only the duration changes; the dash pattern stays the diagram's. `entities: { pv: { entity: sensor.solar_power, speed: auto, max: 8000 } }`
 
+## Automation and its last run (experimental)
+
+`automation: automation.hall_light` in place of `content` draws that automation as a top-to-bottom flowchart (triggers, conditions, actions; `choose`/`if` as decisions, `repeat` as a loop) from its config, and marks the path of its latest trace: steps that ran get `classDef ran` (amber border), failed steps `classDef failed` (red), edges along the path animate. Labels come from each item's `alias`, else a short description. The top node (id `start`) is bound to the automation, so a tap opens its more-info. The card redraws when the automation runs. It needs an admin user (websocket `automation/config`, `trace/list`, `trace/get`) and an automation with an `id`; experimental, the format may change.
+
 ## Template patterns
 
 - Value in a label: `T["Living room<br>{{ states('sensor.t', with_unit=True) }}"]`. Quote labels that contain anything but words: `["…"]`.

@@ -173,6 +173,18 @@ Home Assistant trims the rendered template, so its first line loses any indentat
 
 Mermaid's hexagon shape `A{{text}}` collides with template syntax. Wrap such a diagram in `{% raw %}…{% endraw %}` or write the braces as `{{ '{{' }}` and `{{ '}}' }}`.
 
+### An automation and its last run (experimental)
+
+Instead of `content`, give the card an automation entity. It draws the automation as a flowchart, triggers at the top, then conditions and actions, with `choose` and `if` as branches, and highlights the path of its last run: the steps that ran get an amber border, a step that failed a red one, and the edges along the path move. A tap on the top node opens the automation's more-info, where Home Assistant shows its traces and runs it. The card redraws after every run.
+
+```yaml
+type: custom:mermaid-card
+title: Hall light
+automation: automation.hall_light
+```
+
+The card reads the automation's config and latest trace over Home Assistant's websocket, which needs an admin user. Only automations with an `id` (those made in the UI, or with an `id` in YAML) keep traces; others are drawn without a run. `direction` and `scale` work as usual. This is a prototype: its shape and options may change.
+
 ## Development
 
 <details>

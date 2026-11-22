@@ -23,7 +23,7 @@ const { localize } = await import('../src/localize');
 const entity = (entity_id: string, state: string): HassEntity => ({ entity_id, state, attributes: {} });
 
 function makeHass(states: Record<string, HassEntity>, subscribeMessage = vi.fn()): HomeAssistant {
-  return { states, themes: { darkMode: false }, connection: { subscribeMessage } } as HomeAssistant;
+  return { states, themes: { darkMode: false }, connection: { subscribeMessage } } as unknown as HomeAssistant;
 }
 
 describe('stateColor', () => {

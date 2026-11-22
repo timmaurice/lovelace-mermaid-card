@@ -1,5 +1,6 @@
 import { LitElement, PropertyValues, css, html, nothing, unsafeCSS } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
+import { START, automationFlowchart, type AutomationTrace } from './automation';
 import { bindNodes, toBinding } from './entities';
 import { registerIcons } from './icons';
 import { loadMermaid } from './mermaid';
@@ -86,6 +87,7 @@ const PALETTE: [string, string][] = [
   ['--indigo-color', '#3f51b5'],
 ];
 
+type TraceSummary = { run_id: string; timestamp: { start: string } };
 type TemplateMessage = { result: string } | { error: string; level?: string };
 
 export class MermaidCard extends LitElement {
@@ -106,6 +108,7 @@ export class MermaidCard extends LitElement {
   private _unsubscribe?: Promise<() => Promise<void>>;
   private _renderToken = 0;
   private _renderedKey?: string;
+  private _automationKey?: string;
 
   public static getConfigElement(): HTMLElement {
     return document.createElement(EDITOR_ELEMENT_NAME);
@@ -116,7 +119,11 @@ export class MermaidCard extends LitElement {
   }
 
   public setConfig(config: MermaidCardConfig): void {
-    if (typeof config?.content !== 'string' || !config.content.trim()) {
+    if (config?.automation !== undefined) {
+      if (typeof config.automation !== 'string' || !config.automation.startsWith('automation.')) {
+        throw new Error('automation must be an automation entity id, e.g. automation.hall_light');
+      }
+    } else if (typeof config?.content !== 'string' || !config.content.trim()) {
       throw new Error('content is required: the Mermaid source of the diagram');
     }
     if (config.entities !== undefined && (typeof config.entities !== 'object' || Array.isArray(config.entities))) {
@@ -146,9 +153,12 @@ export class MermaidCard extends LitElement {
       throw new Error('scale must be a positive number, in percent');
     }
     this._unsubscribeTemplate();
-    this._config = config;
-    this._text = TEMPLATE.test(config.content) ? undefined : config.content;
-    this._renderedKey = undefined;
+    // A tap on the start node opens the automation's more-info, with its traces and "Run actions".
+    this._config = config.automation
+      ? { ...config, entities: { [START]: config.automation, ...config.entities } }
+      : config;
+    this._text = config.automation || TEMPLATE.test(config.content!) ? undefined : config.content;
+    this._renderedKey = this._automationKey = undefined;
   }
 
   /** Masonry-view height in units of about 50 px; 4 until a diagram has been drawn. */
@@ -189,7 +199,8 @@ export class MermaidCard extends LitElement {
 
   protected updated(changed: PropertyValues<this>): void {
     if (!this._config || !this.hass) return;
-    if (!this._unsubscribe && TEMPLATE.test(this._config.content)) this._subscribeTemplate();
+    if (this._config.automation) void this._watchAutomation(this._config.automation);
+    else if (!this._unsubscribe && TEMPLATE.test(this._config.content!)) this._subscribeTemplate();
 
     // A Gantt chart is drawn for one width; the first render often sees the card before its layout.
     const gantt =
@@ -223,6 +234,41 @@ export class MermaidCard extends LitElement {
       this._error = error.message;
       this._unsubscribe = undefined;
     });
+  }
+
+  /** Draws the automation again whenever it has run since, or finished a run. */
+  private async _watchAutomation(entityId: string): Promise<void> {
+    const { hass } = this;
+    const entity = hass?.states[entityId];
+    // `current` counts running instances: a run that waits (delay) is drawn again when it ends.
+    const key = `${entityId}/${entity?.attributes.last_triggered}/${entity?.attributes.current}`;
+    if (!hass || key === this._automationKey) return;
+    this._automationKey = key;
+    const send = <T>(message: Record<string, unknown>) => hass.connection.sendMessagePromise<T>(message);
+    try {
+      const { config } = await send<{ config: Record<string, unknown> }>({
+        type: 'automation/config',
+        entity_id: entityId,
+      });
+      // Traces are keyed by the automation's own id; one without an id keeps none.
+      const id = entity?.attributes.id;
+      let trace: AutomationTrace | undefined;
+      try {
+        const runs = id ? await send<TraceSummary[]>({ type: 'trace/list', domain: 'automation', item_id: id }) : [];
+        const last = runs.sort((a, b) => a.timestamp.start.localeCompare(b.timestamp.start)).at(-1);
+        if (last) trace = await send({ type: 'trace/get', domain: 'automation', item_id: id, run_id: last.run_id });
+      } catch {
+        // without a trace, the automation is still drawn
+      }
+      if (key !== this._automationKey) return; // it ran again meanwhile
+      this._text = automationFlowchart(
+        config,
+        trace,
+        (entity) => hass.states[entity]?.attributes.friendly_name ?? entity,
+      );
+    } catch (error) {
+      this._error = (error as { message?: string })?.message ?? String(error); // HA rejects with { code, message }
+    }
   }
 
   private _unsubscribeTemplate(): void {

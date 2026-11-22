@@ -20,6 +20,7 @@ export interface HomeAssistant {
   selectedTheme?: { theme?: string } | null;
   connection: {
     subscribeMessage<T>(callback: (message: T) => void, params: Record<string, unknown>): Promise<() => Promise<void>>;
+    sendMessagePromise<T>(message: Record<string, unknown>): Promise<T>;
   };
 }
 
@@ -43,7 +44,9 @@ export interface MermaidCardConfig {
   type: string;
   title?: string;
   /** Mermaid source; may contain Home Assistant templates. Its first line may name the type. */
-  content: string;
+  content?: string;
+  /** Experimental, instead of content: an automation entity, drawn with the path of its last run. */
+  automation?: string;
   /** Mermaid diagram type, used when the content has no header line of its own. Default flowchart. */
   diagram_type?: string;
   /**
