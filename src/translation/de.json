@@ -1,4 +1,8 @@
 {
+  "card": {
+    "enlarge": "Diagramm vergrößern",
+    "close": "Schließen"
+  },
   "editor": {
     "title": "Titel",
     "diagram_type": "Diagrammtyp",

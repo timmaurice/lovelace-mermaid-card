@@ -4,11 +4,16 @@ import { bindNodes, toBinding } from './entities';
 import { loadMermaid } from './mermaid';
 import { EDITOR_ELEMENT_NAME } from './editor';
 import { EXAMPLES, diagramType, withHeader } from './header';
+import { localize } from './localize';
 import { DIRECTIONS, type HomeAssistant, type MermaidCardConfig } from './types';
 
 const ELEMENT_NAME = 'mermaid-card';
 const TEMPLATE = /\{\{|\{%/;
 let renderCount = 0;
+const MDI_ARROW_EXPAND =
+  'M10,21V19H6.41L10.91,14.5L9.5,13.09L5,17.59V14H3V21H10M14.5,10.91L19,6.41V10H21V3H14V5H17.59L13.09,9.5L14.5,10.91Z';
+const MDI_CLOSE =
+  'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z';
 // The first `flowchart`/`graph` header line, with its direction if it has one.
 const FLOWCHART_HEADER = /^([ \t]*(?:flowchart|graph)(?:-elk)?)(?:[ \t]+(?:TB|TD|BT|RL|LR))?([ \t]*;?[ \t]*)$/m;
 
@@ -53,8 +58,12 @@ export class MermaidCard extends LitElement {
   @state() private _error?: string;
   /** The card's width, tracked only to redraw Gantt charts, which Mermaid draws at a fixed width. */
   @state() private _width = 0;
+  /** Whether the diagram is shown below its natural size or scrolls, which offers the enlarged view. */
+  @state() private _shrunk = false;
   private _resizeObserver?: ResizeObserver;
   @query('.diagram') private _diagram?: HTMLDivElement;
+  @query('dialog') private _dialog?: HTMLDialogElement;
+  private _svg?: string;
 
   private _unsubscribe?: Promise<() => Promise<void>>;
   private _renderToken = 0;
@@ -115,6 +124,7 @@ export class MermaidCard extends LitElement {
       this._resizeObserver ??= new ResizeObserver(([entry]) => {
         const width = Math.round(entry.contentRect.width);
         if (width > 0 && Math.abs(width - this._width) > 8) this._width = width;
+        this._measure();
       });
       this._resizeObserver.observe(this);
     }
@@ -193,10 +203,12 @@ export class MermaidCard extends LitElement {
       await this.updateComplete;
       if (!this._diagram) return;
       this._error = undefined;
-      this._diagram.innerHTML = svg;
+      this._diagram.innerHTML = this._svg = svg;
       sizeDiagram(this._diagram.querySelector('svg'), this._config?.scale);
       bindFunctions?.(this._diagram);
+      if (this._dialog?.open) this._fillDialog();
       this._bind();
+      this._measure();
     } catch (error) {
       if (token !== this._renderToken) return;
       this._error = error instanceof Error ? error.message : String(error);
@@ -215,9 +227,33 @@ export class MermaidCard extends LitElement {
     return `${source}\n%%{init: ${JSON.stringify({ gantt })}}%%`;
   }
 
+  private _measure(): void {
+    const svg = this._diagram?.querySelector('svg');
+    // maxWidth is the natural width sizeDiagram set; a scrolling diagram sits at its smaller minWidth.
+    this._shrunk = Boolean(svg && svg.getBoundingClientRect().width < parseFloat(svg.style.maxWidth) - 1);
+  }
+
+  private _enlarge(): void {
+    this._fillDialog();
+    this._bind();
+    this._dialog?.showModal();
+  }
+
+  /** The same diagram at its natural width; the dialog scrolls both ways. */
+  private _fillDialog(): void {
+    const content = this._dialog?.querySelector('.enlarged');
+    if (!content || !this._svg) return;
+    content.innerHTML = this._svg;
+    const svg = content.querySelector('svg');
+    sizeDiagram(svg, this._config?.scale);
+    if (svg) svg.style.minWidth = svg.style.maxWidth;
+  }
+
   private _bind(): void {
-    if (!this._diagram || !this.hass || !this._config?.entities) return;
-    bindNodes(this._diagram, this._config.entities, this.hass.states, (binding, action) =>
+    if (!this.hass || !this._config?.entities) return;
+    // The render root covers the card's diagram and the enlarged copy in the dialog.
+    bindNodes(this.renderRoot, this._config.entities, this.hass.states, (binding, action) => {
+      this._dialog?.close(); // whatever the action opens must not end up behind the modal
       // Home Assistant runs the action, as for its own cards; a tap opens more-info by default.
       this.dispatchEvent(
         new CustomEvent('hass-action', {
@@ -225,8 +261,8 @@ export class MermaidCard extends LitElement {
           bubbles: true,
           composed: true,
         }),
-      ),
-    );
+      );
+    });
   }
 
   private _boundStatesChanged(oldHass?: HomeAssistant): boolean {
@@ -273,8 +309,30 @@ export class MermaidCard extends LitElement {
     return html`
       <ha-card .header=${this._config.title}>
         ${this._error ? html`<ha-alert alert-type="error">${this._error}</ha-alert>` : nothing}
-        <div class="diagram"></div>
+        <div class="diagram ${this._shrunk ? 'shrunk' : ''}"></div>
+        ${
+          this._shrunk
+            ? html`<ha-icon-button
+                class="enlarge"
+                .label=${localize(this.hass, 'card.enlarge')}
+                .path=${MDI_ARROW_EXPAND}
+                @click=${this._enlarge}
+              ></ha-icon-button>`
+            : nothing
+        }
       </ha-card>
+      <dialog
+        @click=${(event: Event) => event.target === this._dialog && this._dialog.close()}
+        @close=${() => this._dialog?.querySelector('.enlarged')?.replaceChildren()}
+      >
+        <div class="enlarged"></div>
+        <ha-icon-button
+          class="close"
+          .label=${localize(this.hass, 'card.close')}
+          .path=${MDI_CLOSE}
+          @click=${() => this._dialog?.close()}
+        ></ha-icon-button>
+      </dialog>
     `;
   }
 
@@ -283,6 +341,7 @@ export class MermaidCard extends LitElement {
       display: block; /* an inline host reports no size to the ResizeObserver */
     }
     ha-card {
+      position: relative;
       overflow: hidden;
     }
     ha-alert {
@@ -296,18 +355,52 @@ export class MermaidCard extends LitElement {
     ha-card[header] .diagram {
       padding-top: 0;
     }
+    ha-card:not([header]) .diagram.shrunk {
+      padding-top: 48px; /* room for the enlarge button, which would cover the diagram's corner */
+    }
     .diagram svg {
       display: block;
       margin: 0 auto; /* not flex centring: that would cut off the left edge once it scrolls */
       max-width: 100%;
       height: auto;
     }
-    .diagram .node[role='button']:focus-visible {
+    .diagram .node[role='button']:focus-visible,
+    .enlarged .node[role='button']:focus-visible {
       outline: 2px solid var(--primary-color);
     }
+    .enlarge,
+    .close {
+      position: absolute;
+      top: 4px;
+      inset-inline-end: 4px;
+      color: var(--secondary-text-color);
+    }
+    dialog {
+      padding: 0; /* .enlarged fills it, so a click that lands on the dialog itself is on the backdrop */
+      border: none;
+      border-radius: var(--ha-card-border-radius, 12px);
+      max-width: calc(100vw - 32px);
+      max-height: calc(100vh - 32px);
+      background: var(--ha-card-background, var(--card-background-color, #fff));
+      color: var(--primary-text-color);
+    }
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.6);
+    }
+    .enlarged {
+      box-sizing: border-box;
+      max-height: inherit;
+      overflow: auto;
+      padding: 48px 16px 16px;
+    }
+    .enlarged svg {
+      display: block;
+      margin: 0 auto;
+      height: auto;
+    }
     @media (prefers-reduced-motion: reduce) {
-      .diagram .edge-animation-fast,
-      .diagram .edge-animation-slow {
+      .edge-animation-fast,
+      .edge-animation-slow {
         animation: none !important;
       }
     }

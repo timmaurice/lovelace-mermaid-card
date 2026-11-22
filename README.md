@@ -54,7 +54,7 @@ entities:
   flow: sensor.heat_pump_power
 ```
 
-A diagram shrinks to fit the card down to three quarters of its natural size; beyond that it scrolls sideways, so the text stays readable. For a narrow card, `direction: TD` usually fits better than a wide `LR` flowchart.
+A diagram shrinks to fit the card down to three quarters of its natural size; beyond that it scrolls sideways, so the text stays readable. For a narrow card, `direction: TD` usually fits better than a wide `LR` flowchart. When a diagram does not fit, a button in the card's corner opens it at full size in a dialog, where bound nodes still work.
 
 Mermaid's hexagon shape `A{{text}}` collides with template syntax. Wrap such a diagram in `{% raw %}…{% endraw %}` or write the braces as `{{ '{{' }}` and `{{ '}}' }}`.
 
