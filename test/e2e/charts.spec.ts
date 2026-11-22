@@ -82,6 +82,14 @@ test('binds Gantt tasks and kanban items by id, mind maps, pies and sankeys by l
   await expect
     .poll(() => fill(mindmap.locator('.mindmap-node', { hasText: 'Lamp (hall)' }).locator('rect, path').first()))
     .toContain('--state-light-active-color');
+  // A mind map's section text is white, unreadable on the tint: the label takes the theme's.
+  expect(
+    await mindmap
+      .locator('.mindmap-node', { hasText: 'Lamp (hall)' })
+      .locator('span')
+      .first()
+      .evaluate((span) => span.style.getPropertyValue('color')),
+  ).toBe('var(--primary-text-color)');
   expect(await fill(pie.locator('.pieCircle').nth(1))).toBe('');
   expect(consoleErrors).toEqual([]);
 });

@@ -206,6 +206,19 @@ export function bindNodes(
           shape.style.removeProperty('stroke');
         }
       }
+      // A mind map labels in its section's text colour, white on the section's own fill: on the tint
+      // the label needs the theme's.
+      if (tint && node.classList.contains('mindmap-node')) {
+        for (const label of node.querySelectorAll<SVGElement>('span, text')) {
+          if (color)
+            label.style.setProperty(
+              label.tagName === 'text' ? 'fill' : 'color',
+              'var(--primary-text-color)',
+              'important',
+            );
+          else label.style.removeProperty(label.tagName === 'text' ? 'fill' : 'color');
+        }
+      }
       // An icon draws in currentColor from an inline `color`: it takes the state colour, as a tile card's icon does.
       for (const icon of node.querySelectorAll<SVGElement>('g[style*="color"]')) {
         const own = (icon.dataset.ownColor ??= icon.style.color);
