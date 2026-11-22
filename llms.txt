@@ -41,7 +41,7 @@ entities:                 # optional; node or edge id -> entity
 - **Edges** of flowcharts. Name an edge with Mermaid's `@` syntax, `A e1@--> B`, and bind `e1`. Unnamed edges have ids like `L_A_B_0` (`L_<from>_<to>_<n>`).
 - A value is an entity id, or a mapping with `entity`, `tap_action`, `hold_action` (Home Assistant's [action format](https://www.home-assistant.io/dashboards/actions/): `more-info`, `toggle`, `navigate`, `perform-action`, `url`, `none`).
 - Node colour follows the entity's state: active (`on`, `open`, `heat`, `home`, any other text) gets the domain's active colour, inactive (`off`, `closed`, `idle`, `standby`, `not_home`, `locked`, `paused`, `docked`, `disarmed`) the inactive colour, `unavailable`/`unknown` the unavailable colour. Numeric states leave the node uncoloured: put values in the label instead.
-- Tap opens more-info unless `tap_action` says otherwise; a long press runs `hold_action` only when it is set. Edges take no actions.
+- Tap opens more-info unless `tap_action` says otherwise; a long press runs `hold_action` only when it is set. Edges take no actions. The *Controls* example below runs one of each action.
 - A bound edge moves while its entity is active: on, open, heating, or a number other than zero. It takes the entity's colour, arrowhead included. How it moves comes from the diagram: `e1@{ animation: slow }` (or `fast`), or a `classDef` with its own `animation` applied with `class e1 …`; with none, it moves fast. "Reduce motion" stops all of it.
 - The binding colours every node bound to an entity. To mark one state of many (the current robot state, the branch taken), use a template that writes `class <id> <classDef>` instead.
 
@@ -135,6 +135,85 @@ content: |
   class {{ states('input_select.robot_vacuum') }} current
 ```
 
+### Controls
+```yaml
+type: custom:mermaid-card
+title: Controls
+direction: LR
+content: |
+  HOME(["Home"])
+  HOME light@--> LIGHT["Kitchen light<br>{{ state_translated('input_boolean.kitchen_light') }}<br>tap: toggle"]
+  HOME wash@--> WASH["Washer<br>{{ state_translated('input_boolean.washer') }}<br>tap: details · hold: toggle"]
+  HOME --> TEMP["Living room<br>{{ states('input_number.living_room_temperature', with_unit=True) }}<br>tap: +0.5 · hold: back to 21"]
+  HOME --> VAC["Robot vacuum<br>{{ states('input_select.robot_vacuum') }}<br>tap: next state"]
+  HOME --> SOLAR["Solar<br>{{ states('input_number.solar_power') | int }} W<br>tap: energy dashboard"]
+  HOME --> SUN["Sun<br>{{ state_translated('sun.sun') }}<br>tap: integration docs"]
+entities:
+  LIGHT:
+    entity: input_boolean.kitchen_light
+    tap_action:
+      action: toggle
+  light: input_boolean.kitchen_light
+  WASH:
+    entity: input_boolean.washer
+    hold_action:
+      action: toggle
+  wash: input_boolean.washer
+  TEMP:
+    entity: input_number.living_room_temperature
+    tap_action:
+      action: perform-action
+      perform_action: input_number.increment
+      target:
+        entity_id: input_number.living_room_temperature
+    hold_action:
+      action: perform-action
+      perform_action: input_number.set_value
+      target:
+        entity_id: input_number.living_room_temperature
+      data:
+        value: 21
+  VAC:
+    entity: input_select.robot_vacuum
+    tap_action:
+      action: perform-action
+      perform_action: input_select.select_next
+      target:
+        entity_id: input_select.robot_vacuum
+    hold_action:
+      action: more-info
+  SOLAR:
+    entity: input_number.solar_power
+    tap_action:
+      action: navigate
+      navigation_path: "/energy"
+  SUN:
+    entity: sun.sun
+    tap_action:
+      action: url
+      url_path: "https://www.home-assistant.io/integrations/sun/"
+```
+
+### Room temperatures
+```yaml
+type: custom:mermaid-card
+title: Room temperatures
+diagram_type: xychart-beta
+content: |
+  ---
+  config:
+    xyChart:
+      width: 340
+      height: 320
+  ---
+  {% set rooms = ['outdoor', 'living_room', 'kitchen', 'bedroom'] %}
+    title "vs. 21 °C"
+    x-axis [{% for r in rooms %}"{{ state_attr('input_number.' ~ r ~ '_temperature', 'friendly_name') | replace(' temperature', '') }}"{{ ', ' if not loop.last }}{% endfor %}]
+    y-axis "°C" -10 --> 30
+    bar [{% for r in rooms %}{{ states('input_number.' ~ r ~ '_temperature') | float(0) }}{{ ', ' if not loop.last }}{% endfor %}]
+    line [21, 21, 21, 21]
+```
+
 ### Energy flow
 ```yaml
 type: custom:mermaid-card
@@ -160,24 +239,18 @@ content: |
   {%- endfor %}
 ```
 
-### Room temperatures
+### Kanban
 ```yaml
 type: custom:mermaid-card
-title: Room temperatures
-diagram_type: xychart-beta
+title: Kanban
+diagram_type: kanban
 content: |
-  ---
-  config:
-    xyChart:
-      width: 340
-      height: 320
-  ---
-  {% set rooms = ['outdoor', 'living_room', 'kitchen', 'bedroom'] %}
-    title "vs. 21 °C"
-    x-axis [{% for r in rooms %}"{{ state_attr('input_number.' ~ r ~ '_temperature', 'friendly_name') | replace(' temperature', '') }}"{{ ', ' if not loop.last }}{% endfor %}]
-    y-axis "°C" -10 --> 30
-    bar [{% for r in rooms %}{{ states('input_number.' ~ r ~ '_temperature') | float(0) }}{{ ', ' if not loop.last }}{% endfor %}]
-    line [21, 21, 21, 21]
+  {%- for column, state in [('On', 'on'), ('Off', 'off')] %}
+  {{ state }}_column[{{ column }}]
+  {%- for e in states.input_boolean | selectattr('state', 'eq', state) %}
+    {{ e.object_id }}[{{ e.name }}]{% if area_name(e.entity_id) %}@{ assigned: '{{ area_name(e.entity_id) }}' }{% endif %}
+  {%- endfor %}
+  {%- endfor %}
 ```
 
 ### Pie chart
@@ -198,16 +271,18 @@ content: |
   {%- endif %}
 ```
 
-### Kanban
+### Mind map
 ```yaml
 type: custom:mermaid-card
-title: Kanban
-diagram_type: kanban
+title: Mind map
+diagram_type: mindmap
 content: |
-  {%- for column, state in [('On', 'on'), ('Off', 'off')] %}
-  {{ state }}_column[{{ column }}]
-  {%- for e in states.input_boolean | selectattr('state', 'eq', state) %}
-    {{ e.object_id }}[{{ e.name }}]{% if area_name(e.entity_id) %}@{ assigned: '{{ area_name(e.entity_id) }}' }{% endif %}
+  root(({{ state_attr('zone.home', 'friendly_name') or 'Home' }}))
+  {%- for f in floors() %}
+    {{ floor_name(f) }}
+  {%- for a in floor_areas(f) %}
+  {%- set temperature = area_entities(a) | select('match', 'input_number[.].*temperature') | first %}
+      {{ area_name(a) }}{{ ' · ' ~ states(temperature, with_unit=True) if temperature }}
   {%- endfor %}
   {%- endfor %}
 ```
@@ -233,22 +308,6 @@ content: |
     HA->>HA: {{ states.input_boolean | selectattr('state', 'eq', 'on') | list | count }} helpers on
 ```
 
-### Mind map
-```yaml
-type: custom:mermaid-card
-title: Mind map
-diagram_type: mindmap
-content: |
-  root(({{ state_attr('zone.home', 'friendly_name') or 'Home' }}))
-  {%- for f in floors() %}
-    {{ floor_name(f) }}
-  {%- for a in floor_areas(f) %}
-  {%- set temperature = area_entities(a) | select('match', 'input_number[.].*temperature') | first %}
-      {{ area_name(a) }}{{ ' · ' ~ states(temperature, with_unit=True) if temperature }}
-  {%- endfor %}
-  {%- endfor %}
-```
-
 ### Class diagram
 ```yaml
 type: custom:mermaid-card
@@ -267,6 +326,9 @@ content: |
   {%- endfor %}
     zone_home "1" --> "*" {{ (states.person | first).entity_id | replace('.', '_') }} : is home
     sun_sun ..> zone_home : shines on
+entities:
+  sun_sun: sun.sun
+  zone_home: zone.home
 ```
 
 ### Entity relationship
