@@ -38,11 +38,12 @@ export const toBinding = (value: string | NodeBinding): NodeBinding =>
 
 /**
  * Seconds one run of Mermaid's dash keyframes takes for a `speed: auto` edge: from 50 s (Mermaid's
- * slow) for a value near zero to 5 s at `max`. The value goes in on a log scale, so a few watts
- * still visibly move next to kilowatts; the speed in between is linear in that, not the duration.
+ * slow) for a value near zero to 5 s at `max`. The value goes in as its square root: a quarter of
+ * `max` moves half as fast as `max`, and a few watts still visibly move. A log scale made 650 W and
+ * 3200 W look the same. The speed in between is linear in that, not the duration.
  */
 export function edgeDuration(value: number, max = 10000): number {
-  const fraction = Math.min(1, Math.log1p(Math.abs(value)) / Math.log1p(max));
+  const fraction = Math.min(1, Math.sqrt(Math.abs(value) / max));
   return Math.round((900 / (18 + fraction * (180 - 18))) * 10) / 10; // the keyframes run 900 px
 }
 

@@ -206,6 +206,8 @@ describe('bindNodes', () => {
     expect(edgeDuration(10)).toBeGreaterThan(edgeDuration(100));
     expect(edgeDuration(100)).toBeGreaterThan(edgeDuration(1000));
     expect(edgeDuration(3, 10)).toBeLessThan(edgeDuration(3)); // a kW sensor with max: 10
+    // A washer at a fifth of the solar power visibly moves slower, about half as fast.
+    expect(edgeDuration(650, 4000) / edgeDuration(3200, 4000)).toBeGreaterThan(1.8);
   });
 
   it('sets duration and direction inline for speed: auto, and only there', () => {

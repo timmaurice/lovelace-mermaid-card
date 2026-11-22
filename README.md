@@ -199,7 +199,7 @@ entities:
 
 On a bound edge, `active_when` decides when it moves. Numbers go in quotes (`active_when: "3"`).
 
-With `speed: auto` the edge moves faster the higher its entity's value, like an energy-flow card: from Mermaid's slow speed near zero to four times its fast speed at `max` (default `10000`). The value counts on a log scale, so 50 W still visibly moves next to 5 kW. A negative value (export to the grid) moves just as fast, in the other direction. The edge keeps its dash pattern, and still only moves while the value is not zero.
+With `speed: auto` the edge moves faster the higher its entity's value, like an energy-flow card: from Mermaid's slow speed near zero to four times its fast speed at `max` (default `10000`). The value counts by its square root: a quarter of `max` moves half as fast, and 50 W still visibly moves. Set `max` to about the highest value the entity reaches, so the scale uses its full range. A negative value (export to the grid) moves just as fast, in the other direction. The edge keeps its dash pattern, and still only moves while the value is not zero.
 
 ```yaml
 entities:
