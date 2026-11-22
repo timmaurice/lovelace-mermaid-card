@@ -9,6 +9,8 @@
   },
   "editor": {
     "title": "Titel",
+    "automation": "Automation",
+    "automation_helper": "Statt eines Diagramms: zeichnet die Automation mit dem Weg ihres letzten Laufs.",
     "diagram_type": "Diagrammtyp",
     "content": "Diagramm",
     "content_helper": "Mermaid-Quelltext. Templates wie {{ states(...) }} werden live gerendert.",

@@ -9,6 +9,8 @@
   },
   "editor": {
     "title": "Title",
+    "automation": "Automation",
+    "automation_helper": "Instead of a diagram: draws the automation, with the path of its last run.",
     "diagram_type": "Diagram type",
     "content": "Diagram",
     "content_helper": "Mermaid source. Templates like {{ states(...) }} are rendered live.",

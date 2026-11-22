@@ -190,12 +190,22 @@ export class MermaidCardEditor extends LitElement {
       diagram_type: type ?? value.diagram_type ?? 'flowchart',
       direction: direction ?? value.direction,
     } as MermaidCardConfig;
-    // A new type brings its example along, as long as nothing of the user's would be lost.
-    const before = this._config ? this._formData(this._config) : undefined;
-    if (before && !type && config.diagram_type !== before.diagram_type) {
-      const untouched = !content.trim() || content === EXAMPLES[before.diagram_type as keyof typeof EXAMPLES];
-      const example = EXAMPLES[config.diagram_type as keyof typeof EXAMPLES];
-      if (untouched && example) config.content = example;
+    // An automation draws its own diagram: the card needs no content, type or direction then.
+    if (config.automation) {
+      delete config.content;
+      delete config.diagram_type;
+      delete config.direction;
+    } else {
+      delete config.automation; // cleared in the picker
+      // A new type brings its example along, as long as nothing of the user's would be lost; back
+      // from an automation, the card needs content again.
+      const before = this._config ? this._formData(this._config) : undefined;
+      if (this._config?.automation && !content.trim()) config.content = EXAMPLES.flowchart;
+      else if (before && !type && config.diagram_type !== before.diagram_type) {
+        const untouched = !content.trim() || content === EXAMPLES[before.diagram_type as keyof typeof EXAMPLES];
+        const example = EXAMPLES[config.diagram_type as keyof typeof EXAMPLES];
+        if (untouched && example) config.content = example;
+      }
     }
     if (!config.title) delete config.title;
     // A direction only means something for a flowchart; it would linger unseen otherwise.
@@ -261,6 +271,42 @@ export class MermaidCardEditor extends LitElement {
     return text.startsWith('editor.') ? undefined : text;
   };
 
+  /** The fields of a diagram written by hand; an automation draws its own. */
+  private _diagramSchema(types: string[], type: string) {
+    return [
+      {
+        name: 'diagram_type',
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: types.map((value) => ({
+              value,
+              label: localize(this.hass, `editor.diagram_type_options.${value}`).replace(/^editor\..*/, value),
+            })),
+          },
+        },
+      },
+      { name: 'content', required: true, selector: { template: {} } },
+      // Mermaid only knows a direction for flowcharts.
+      ...(type === 'flowchart' || !type
+        ? [
+            {
+              name: 'direction',
+              selector: {
+                select: {
+                  mode: 'dropdown',
+                  options: ['TB', 'BT', 'LR', 'RL'].map((value) => ({
+                    value,
+                    label: localize(this.hass, `editor.direction_options.${value}`),
+                  })),
+                },
+              },
+            },
+          ]
+        : []),
+    ];
+  }
+
   protected render() {
     if (!this.hass || !this._config) return nothing;
     const used = new Set(this._rows.map((row) => row.node));
@@ -278,36 +324,8 @@ export class MermaidCardEditor extends LitElement {
         .error=${this._parseError ? { content: this._parseError } : undefined}
         .schema=${[
           { name: 'title', selector: { text: {} } },
-          {
-            name: 'diagram_type',
-            selector: {
-              select: {
-                mode: 'dropdown',
-                options: types.map((value) => ({
-                  value,
-                  label: localize(this.hass, `editor.diagram_type_options.${value}`).replace(/^editor\..*/, value),
-                })),
-              },
-            },
-          },
-          { name: 'content', required: true, selector: { template: {} } },
-          // Mermaid only knows a direction for flowcharts.
-          ...(type === 'flowchart' || !type
-            ? [
-                {
-                  name: 'direction',
-                  selector: {
-                    select: {
-                      mode: 'dropdown',
-                      options: ['TB', 'BT', 'LR', 'RL'].map((value) => ({
-                        value,
-                        label: localize(this.hass, `editor.direction_options.${value}`),
-                      })),
-                    },
-                  },
-                },
-              ]
-            : []),
+          { name: 'automation', selector: { entity: { filter: { domain: 'automation' } } } },
+          ...(data.automation ? [] : this._diagramSchema(types, type)),
           {
             name: 'scale',
             selector: { number: { mode: 'slider', min: 30, max: 100, step: 10, unit_of_measurement: '%' } },
@@ -421,7 +439,7 @@ export class MermaidCardEditor extends LitElement {
         <div class="add">
           <ha-button @click=${this._addRow}>${localize(this.hass, 'editor.add_binding')}</ha-button>
           ${
-            type === 'flowchart'
+            type === 'flowchart' && !data.automation
               ? html`<ha-form
                   .hass=${this.hass}
                   .data=${{}}

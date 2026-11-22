@@ -625,6 +625,32 @@ describe('MermaidCardEditor', () => {
     });
   });
 
+  it('edits an automation card without content, and brings content back when the automation is cleared', async () => {
+    const { EXAMPLES } = await import('../src/header');
+    const editor = new MermaidCardEditor();
+    editor.hass = makeHass({});
+    const emitted: Record<string, unknown>[] = [];
+    editor.addEventListener('config-changed', (event) => emitted.push((event as CustomEvent).detail.config));
+    editor.setConfig({ type: 'custom:mermaid-card', automation: 'automation.hall' });
+    document.body.append(editor);
+    await editor.updateComplete;
+    const form = editor.shadowRoot!.querySelector('ha-form') as unknown as { schema: { name: string }[] };
+    expect(form.schema.map((field) => field.name)).toEqual(['title', 'automation', 'scale']);
+
+    const change = (value: Record<string, unknown>) =>
+      (editor as unknown as { _formChanged(event: CustomEvent): void })._formChanged(
+        new CustomEvent('value-changed', {
+          detail: { value: { content: '', diagram_type: 'flowchart', direction: 'TB', scale: 100, ...value } },
+        }),
+      );
+    change({ automation: 'automation.hall', title: 'Hall' }); // the form hands back its hidden fields too
+    expect(emitted.at(-1)).toEqual({ type: 'custom:mermaid-card', automation: 'automation.hall', title: 'Hall' });
+
+    change({ automation: undefined, title: 'Hall' });
+    expect(emitted.at(-1)).toEqual({ type: 'custom:mermaid-card', title: 'Hall', content: EXAMPLES.flowchart });
+    editor.remove();
+  });
+
   it('swaps in the example of a new type, but never over the user’s own content', async () => {
     const { EXAMPLES } = await import('../src/header');
     const editor = new MermaidCardEditor();
