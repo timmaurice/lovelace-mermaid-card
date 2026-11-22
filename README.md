@@ -219,6 +219,8 @@ Global setup builds the card, starts the compose Home Assistant, onboards it thr
 
 For further assistance or to [report issues](https://github.com/timmaurice/lovelace-mermaid-card/issues), please visit the [GitHub repository](https://github.com/timmaurice/lovelace-mermaid-card).
 
+The icon uses the [Mermaid](https://github.com/mermaid-js/mermaid) logo, MIT licensed, © Knut Sveidqvist.
+
 ## ☕ Support My Work
 
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="30" />](https://www.buymeacoffee.com/timmaurice)
