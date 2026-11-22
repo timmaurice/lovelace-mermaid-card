@@ -1,6 +1,6 @@
 {
   "name": "mermaid-card",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "A Home Assistant Lovelace card that renders Mermaid diagrams with live entity states.",
   "main": "dist/mermaid-card.js",
   "scripts": {
