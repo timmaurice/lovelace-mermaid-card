@@ -299,6 +299,9 @@ xychart-beta
 ];
 
 // The states stay after the run, so the catalog dashboard keeps working when shown in the sidebar.
+// Compact enough for the sidebar view's narrow column.
+const BESIDE = new Set(['mindmap', 'kanban', 'class', 'block', 'gitgraph']);
+
 test.beforeAll(async () => {
   for (const [entityId, state, attributes] of STATES) await setState(entityId, state, attributes);
 });
@@ -307,8 +310,15 @@ test('every catalog diagram renders', async ({ page, consoleErrors }) => {
   const configs = CATALOG.map((card) => ({ type: 'custom:mermaid-card', ...card, file: undefined })); // JSON drops it
   const urlPath = await useDashboard('catalog', {
     views: [
-      // To browse: each card on its own.
-      { title: 'Catalog', path: 'catalog', cards: configs },
+      // To browse: wide types in the main column, compact ones beside them.
+      {
+        title: 'Catalog',
+        path: 'catalog',
+        type: 'sidebar',
+        cards: configs.map((card, index) =>
+          BESIDE.has(CATALOG[index].file) ? { ...card, view_layout: { position: 'sidebar' } } : card,
+        ),
+      },
       // To photograph: one column, so every card has the same width and wide types fit.
       {
         title: 'Screenshots',
