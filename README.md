@@ -92,6 +92,8 @@ The editor is available in English and German. Contributions of further language
     npm run build
     ```
 
+Run the unit tests with `npm test` (or keep them running with `npm run test:watch`) and the type check with `npm run typecheck`.
+
 ### Local Testing with Docker
 
 `docker compose up -d` starts Home Assistant at [http://localhost:8137](http://localhost:8137) with `dist/` mounted as `/config/www`, so the card is served as `/local/mermaid-card.js`. Its configuration persists in `test/ha-config`.
