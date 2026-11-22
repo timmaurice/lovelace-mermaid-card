@@ -81,14 +81,21 @@ describe('bindNodes', () => {
 
   it('animates a bound edge while its entity is active', () => {
     const root = document.createElement('div');
-    root.innerHTML = '<svg><path data-id="e1"></path><g data-id="e1"></g></svg>';
-    const edge = root.querySelector('path')!;
+    root.innerHTML =
+      '<svg><marker id="m"><path></path></marker><path data-id="e1" marker-end="url(#m)"></path><g data-id="e1"></g></svg>';
+    const edge = root.querySelector<SVGPathElement>('path[data-id]')!;
     bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'on') }, vi.fn());
     expect(edge.classList.contains('edge-animation-fast')).toBe(true);
     expect(edge.style.getPropertyValue('stroke')).toContain('--state-switch-active-color');
+    // The arrowhead takes the colour too, from a copy: the shared marker stays as Mermaid drew it.
+    const copy = root.querySelector<SVGMarkerElement>(`[id="${edge.getAttribute('marker-end')!.slice(5, -1)}"]`)!;
+    expect(copy.id).not.toBe('m');
+    expect(copy.querySelector('path')!.style.getPropertyValue('fill')).toContain('--state-switch-active-color');
+    expect(root.querySelector('#m path')!.getAttribute('style')).toBeNull();
     bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'off') }, vi.fn());
     expect(edge.classList.contains('edge-animation-fast')).toBe(false);
     expect(edge.style.getPropertyValue('stroke')).toBe('');
+    expect(edge.getAttribute('marker-end')).toBe('url(#m)');
   });
 });
 

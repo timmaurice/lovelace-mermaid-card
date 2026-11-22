@@ -28,6 +28,38 @@ export const toBinding = (value: string | NodeBinding): NodeBinding =>
 const HOLD_MS = 500;
 
 /**
+ * Points an edge's arrowheads at copies filled with `color`, or back at Mermaid's own without one.
+ * Markers are shared by all edges, so a coloured edge needs its own copy, as Mermaid's linkStyle
+ * makes one.
+ */
+function colorMarkers(edge: SVGPathElement, color?: string): void {
+  const svg = edge.ownerSVGElement;
+  for (const attribute of ['marker-start', 'marker-end']) {
+    const own = edge.getAttribute(`data-own-${attribute}`) ?? edge.getAttribute(attribute);
+    const id = own && /url\(#(.+)\)/.exec(own)?.[1];
+    if (!svg || !own || !id) continue;
+    edge.setAttribute(`data-own-${attribute}`, own);
+    if (!color) {
+      edge.setAttribute(attribute, own);
+      continue;
+    }
+    const copyId = `${id}__${color.replace(/[^\w-]/g, '_')}`;
+    if (!svg.getElementById(copyId)) {
+      const marker = svg.getElementById(id);
+      if (!marker) continue;
+      const copy = marker.cloneNode(true) as SVGElement;
+      copy.id = copyId;
+      for (const shape of copy.querySelectorAll<SVGElement>('path, circle')) {
+        shape.style.setProperty('fill', color, 'important');
+        shape.style.setProperty('stroke', color, 'important');
+      }
+      marker.after(copy);
+    }
+    edge.setAttribute(attribute, `url(#${copyId})`);
+  }
+}
+
+/**
  * Colours the nodes named in `bindings` after their entity and makes them open more-info.
  * Mermaid gives a node no `data-id`, only a DOM id like `<render id>-flowchart-<node id>-<n>`
  * (`state-…` in state diagrams, `classId-…` in class diagrams), so that is what is matched.
@@ -45,11 +77,12 @@ export function bindNodes(
     const binding = toBinding(value);
     const entity = states[binding.entity];
     for (const edge of edges.filter((candidate) => candidate.dataset.id === nodeId)) {
+      const color = isActive(entity) ? (stateColor(entity) ?? 'var(--state-active-color)') : undefined;
       // Mermaid's own `animate: true` class, whose CSS every diagram already carries.
-      const active = isActive(entity);
-      edge.classList.toggle('edge-animation-fast', active);
-      if (active) edge.style.setProperty('stroke', stateColor(entity) ?? 'var(--state-active-color)', 'important');
+      edge.classList.toggle('edge-animation-fast', Boolean(color));
+      if (color) edge.style.setProperty('stroke', color, 'important');
       else edge.style.removeProperty('stroke');
+      colorMarkers(edge, color);
     }
     const pattern = new RegExp(
       `(?:^|-)(?:flowchart|state|classId)-${nodeId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`,
