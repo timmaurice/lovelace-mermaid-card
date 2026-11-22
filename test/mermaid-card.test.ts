@@ -393,6 +393,9 @@ describe('MermaidCardEditor', () => {
       diagram_type: 'stateDiagram-v2',
     });
 
+    change({ content: 'pie showData\n  "a": 1', diagram_type: 'flowchart' }); // more than the dropdown holds
+    expect(emitted.at(-1)).toMatchObject({ content: 'pie showData\n  "a": 1', diagram_type: 'pie' });
+
     change({ content: 'flowchart LR\n  A --> B', diagram_type: 'pie' });
     expect(emitted.at(-1)).toEqual({ type: 'custom:mermaid-card', content: '  A --> B', direction: 'LR' });
 
@@ -475,6 +478,16 @@ describe('diagram header', async () => {
       direction: undefined,
     });
     expect(stripHeader('A --> B')).toEqual({ content: 'A --> B', type: undefined, direction: undefined });
+  });
+
+  it('leaves a header that says more than type and direction in the content', () => {
+    expect(stripHeader('pie showData\n  "a": 1')).toEqual({
+      content: 'pie showData\n  "a": 1',
+      type: 'pie',
+      direction: undefined,
+    });
+    expect(stripHeader('xychart-beta horizontal\n  bar [1]').content).toBe('xychart-beta horizontal\n  bar [1]');
+    expect(stripHeader('graph TD;\n  A --> B').content).toBe('  A --> B'); // a direction and `;` are no more
   });
 
   it('builds the header from the options unless the content has its own', () => {

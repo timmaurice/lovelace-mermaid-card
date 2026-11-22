@@ -55,6 +55,8 @@ interface Split {
   prefix: string;
   type?: string;
   direction?: string;
+  /** Whether the header says more than its type and direction, like `pie showData`. */
+  extra?: boolean;
   /** Everything after the header line, or after the prefix when there is none. */
   body: string;
 }
@@ -66,7 +68,8 @@ function split(content: string): Split {
   if (!header || !KEYWORDS.has(header[1])) return { prefix, body: after };
   const type = ALIASES[header[1]] ?? header[1];
   const direction = type === 'flowchart' ? DIRECTION.exec(header[2])?.[1] : undefined;
-  return { prefix, type, direction, body: after.slice(header[0].length) };
+  const extra = !/^[ \t]*;?[ \t]*$/.test(direction ? header[2].replace(DIRECTION, '') : header[2]);
+  return { prefix, type, direction, extra, body: after.slice(header[0].length) };
 }
 
 /** The type the content's own header declares, if it has one. */
@@ -74,10 +77,14 @@ export function diagramType(content: string): string | undefined {
   return split(content).type;
 }
 
-/** Takes the header out of the content, returning its type and flowchart direction separately. */
+/**
+ * Takes the header out of the content, returning its type and flowchart direction separately. A
+ * header that says more (`pie showData`, `xychart-beta horizontal`) stays, since the options
+ * could not hold the rest; its type is still returned.
+ */
 export function stripHeader(content: string): { content: string; type?: string; direction?: string } {
-  const { prefix, type, direction, body } = split(content);
-  return { content: type ? prefix + body : content, type, direction };
+  const { prefix, type, direction, extra, body } = split(content);
+  return { content: type && !extra ? prefix + body : content, type, direction };
 }
 
 /** The content as Mermaid needs it: its own header if it has one, else one built from the options. */
