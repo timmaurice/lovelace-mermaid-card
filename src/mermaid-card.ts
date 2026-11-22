@@ -403,8 +403,9 @@ export class MermaidCard extends LitElement {
       height: auto;
     }
     @media (prefers-reduced-motion: reduce) {
-      .edge-animation-fast,
-      .edge-animation-slow {
+      /* Every animation, also a classDef's own, which sits inline on the edge */
+      .diagram *,
+      .enlarged * {
         animation: none !important;
       }
     }
