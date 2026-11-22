@@ -70,6 +70,22 @@ describe('editor parse error', () => {
     expect(listNodes).toHaveBeenLastCalledWith('flowchart\nA --> ');
     expect(parseError(editor)).toBe(SHOWN);
 
+    // A header that comes after template lines is the content's own, as in the card: no flowchart
+    // header goes in front, and the form shows the type the text declares.
+    const gantt = "{%- set start = '08:00' %}\ngantt\nWash :wash, {{ start }}, 1h";
+    const header = vi.fn((callback: (message: { result?: string }) => void, params: { template: string }) => {
+      setTimeout(() => callback({ result: params.template.startsWith('{%') ? 'gantt\nWash :wash, 08:00, 1h' : '?' }));
+      return Promise.resolve(() => undefined);
+    });
+    const ganttEditor = new MermaidCardEditor();
+    ganttEditor.hass = { states: {}, connection: { subscribeMessage: header } } as unknown as HomeAssistant;
+    document.body.append(ganttEditor);
+    await edit(ganttEditor, gantt, {});
+    expect(listNodes).toHaveBeenLastCalledWith('gantt\nWash :wash, 08:00, 1h');
+    await ganttEditor.updateComplete;
+    const ganttForm = ganttEditor.shadowRoot!.querySelector('ha-form') as unknown as { data: { diagram_type: string } };
+    expect(ganttForm.data.diagram_type).toBe('gantt');
+
     // Without Home Assistant the templates are blanked: a guess, so no error.
     const offline = new MermaidCardEditor();
     await edit(offline, content, { error: MESSAGE });

@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing, unsafeCSS } from 'lit';
 import { property, state } from 'lit/decorators.js';
-import { DIAGRAM_TYPES, EXAMPLES, stripHeader, withHeader } from './header';
+import { DIAGRAM_TYPES, EXAMPLES, diagramType, stripHeader, withHeader } from './header';
 import { localize } from './localize';
 import editorStyles from './styles/editor.styles.scss';
 import { DiagramNode, listNodes } from './mermaid';
@@ -78,6 +78,8 @@ export class MermaidCardEditor extends LitElement {
   /** Rows shown unfolded: the ones added here, which still need filling in. */
   @state() private _open = new Set<number>();
   @state() private _parseError?: string;
+  /** The type the rendered content declares, when only its templates write the header line. */
+  @state() private _renderedType?: string;
   private _nodesFor?: string;
   private _nodesTimer?: ReturnType<typeof setTimeout>;
 
@@ -87,25 +89,20 @@ export class MermaidCardEditor extends LitElement {
     if (JSON.stringify(toMap(this._rows)) !== JSON.stringify(config.entities ?? {})) {
       this._rows = Object.entries(config.entities ?? {}).map(([node, value]) => ({ node, ...toBinding(value) }));
     }
-    this._scheduleNodeList(this._source(config));
+    this._scheduleNodeList(config);
   }
 
   protected updated(changed: Map<string, unknown>): void {
     // Home Assistant may set the config before hass; templates can only be rendered with it.
     if (changed.has('hass') && !changed.get('hass') && this._config) {
       this._nodesFor = undefined;
-      this._scheduleNodeList(this._source(this._config));
+      this._scheduleNodeList(this._config);
     }
   }
 
   public disconnectedCallback(): void {
     super.disconnectedCallback();
     clearTimeout(this._nodesTimer);
-  }
-
-  /** The Mermaid source the card renders for this config. */
-  private _source(config: MermaidCardConfig): string {
-    return withHeader(config.content ?? '', config.diagram_type, config.direction);
   }
 
   /**
@@ -119,23 +116,30 @@ export class MermaidCardEditor extends LitElement {
     return {
       ...config,
       content,
-      diagram_type: type ?? config.diagram_type ?? 'flowchart',
+      diagram_type: type ?? config.diagram_type ?? this._renderedType ?? 'flowchart',
       // TD is Mermaid's alias for TB; the dropdown offers each direction once.
       direction: finalDirection === 'TD' ? 'TB' : finalDirection,
       scale: config.scale ?? 100, // the slider shows the default instead of its minimum
     };
   }
 
-  /** Re-reads the diagram's nodes, debounced: the content changes on every keystroke. */
-  private _scheduleNodeList(content: string): void {
-    if (content === this._nodesFor) return;
-    this._nodesFor = content;
+  /**
+   * Re-reads the diagram's nodes, debounced: the content changes on every keystroke. The header
+   * goes on after the templates are rendered, as in the card: a template may write it itself.
+   */
+  private _scheduleNodeList(config: MermaidCardConfig): void {
+    const content = config.content ?? '';
+    const key = JSON.stringify([content, config.diagram_type, config.direction]);
+    if (key === this._nodesFor) return;
+    this._nodesFor = key;
     clearTimeout(this._nodesTimer);
     this._nodesTimer = setTimeout(async () => {
-      const { text, exact } = await this._renderOnce(content);
+      const { text: rendered, exact } = await this._renderOnce(content);
+      const text = withHeader(rendered, config.diagram_type, config.direction);
       const { nodes, error } = await listNodes(text);
-      if (content !== this._nodesFor) return;
+      if (key !== this._nodesFor) return;
       this._nodes = nodes;
+      this._renderedType = TEMPLATE.test(content) ? diagramType(rendered) : undefined;
       // Blanked templates are only a guess at the text: an error there may not be in the content.
       this._parseError = exact && error ? parseErrorText(error, text) : undefined;
     }, 400);
