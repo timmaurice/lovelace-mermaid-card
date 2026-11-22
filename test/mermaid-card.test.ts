@@ -148,6 +148,11 @@ describe('MermaidCard', () => {
     card.remove();
   });
 
+  it('colours the mind map root and git branches from the palette, not the near-black card colour', () => {
+    const vars = (new MermaidCard() as unknown as { _themeVariables(): Record<string, string> })._themeVariables();
+    expect([vars.git0, vars.gitBranchLabel0, vars.git7]).toEqual(['#2196f3', '#ffffff', '#3f51b5']); // jsdom: fallbacks
+  });
+
   it('draws the diagram again in the colours of a new theme', async () => {
     const card = new MermaidCard();
     card.setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR\n A --> B' });
