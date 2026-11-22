@@ -66,14 +66,14 @@ Mermaid itself is bundled into the card (about 1.6 MB compressed) but only run w
 
 The card has a visual editor. Pick the **Diagram type** from a dropdown; switching it on an empty diagram or an untouched example fills in an example of the new type. Mermaid pasted with its first line (`flowchart LR`, …) is understood: the editor moves the type and direction into their fields. A first line that says more, like `pie showData`, stays in the diagram. Under **Bound nodes** you pick a node from a list the editor reads from your diagram, and an entity for it. When exactly one entity's friendly name matches the node's text, or its object id the node id, it is filled in for you. In a flowchart, **Add an entity as a node** appends a node with the entity's name and state and binds it in one step.
 
-| Option         | Type   | Required | Description                                                                                                                                                              |
-| -------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `content`      | string | yes      | The diagram. May contain templates (`{{ states('sensor.x') }}`). A first line naming the type (`flowchart LR`, `sequenceDiagram`, …) is optional.                        |
-| `diagram_type` | string | no       | Mermaid diagram type when `content` has no first line naming one: `flowchart` (default), `sequenceDiagram`, `stateDiagram-v2`, `pie`, …                                  |
-| `title`        | string | no       | Card header.                                                                                                                                                             |
-| `entities`     | map    | no       | Node or edge id → entity id, or a mapping with `entity`, `active_when`, `tap_action`, `hold_action`, an edge's `speed` and `max`. For flowcharts, state, class diagrams. |
-| `direction`    | string | no       | A flowchart's direction: `TB` (top to bottom, the default), `BT`, `LR` or `RL`. Overrides a direction in the content's first line.                                       |
-| `scale`        | number | no       | Size in percent of the diagram's natural size, e.g. `70`. Default `100` fits the diagram to the card.                                                                    |
+| Option         | Type   | Required | Description                                                                                                                                                                                                       |
+| -------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `content`      | string | yes      | The diagram. May contain templates (`{{ states('sensor.x') }}`). A first line naming the type (`flowchart LR`, `sequenceDiagram`, …) is optional.                                                                 |
+| `diagram_type` | string | no       | Mermaid diagram type when `content` has no first line naming one: `flowchart` (default), `sequenceDiagram`, `stateDiagram-v2`, `pie`, …                                                                           |
+| `title`        | string | no       | Card header.                                                                                                                                                                                                      |
+| `entities`     | map    | no       | Node or edge id → entity id, or a mapping with `entity`, `active_when`, `tap_action`, `hold_action`, an edge's `speed` and `max`. For flowcharts, state, class diagrams, Gantt, kanban, mind maps, pies, sankeys. |
+| `direction`    | string | no       | A flowchart's direction: `TB` (top to bottom, the default), `BT`, `LR` or `RL`. Overrides a direction in the content's first line.                                                                                |
+| `scale`        | number | no       | Size in percent of the diagram's natural size, e.g. `70`. Default `100` fits the diagram to the card.                                                                                                             |
 
 ```yaml
 type: custom:mermaid-card
@@ -90,6 +90,39 @@ entities:
 ### Bound nodes and edges
 
 A bound node takes its entity's state colour. A tap opens more-info unless the binding sets a `tap_action`; a long press runs its `hold_action`. Both take Home Assistant's usual [actions](https://www.home-assistant.io/dashboards/actions/) (`toggle`, `navigate`, `perform-action`, …).
+
+What the key names depends on the diagram type:
+
+| Type                            | Key               | Example                           |
+| ------------------------------- | ----------------- | --------------------------------- |
+| Flowchart, state, class diagram | node id           | `HP` in `HP[Heat pump]`           |
+| Gantt                           | task id           | `wash` in `Wash :wash, 10:00, 2h` |
+| Kanban                          | item or column id | `card1` in `card1[Clean filter]`  |
+| Mind map                        | label             | `Kitchen` in `k[Kitchen]`         |
+| Pie                             | slice label       | `Washer` in `"Washer" : 30`       |
+| Sankey                          | node name         | `Solar` in `Solar,House,5`        |
+
+Mermaid keeps no ids for mind map nodes, pie slices or sankey nodes, so these are bound by the text they show (a line break counts as a space). A label written by a template must be written the same way in `entities`. Pie slices and sankey nodes keep their chart colours and only take the tap and hold; a pie binding also makes its legend entry tappable.
+
+```yaml
+type: custom:mermaid-card
+content: |
+  mindmap
+  root((Home))
+    Kitchen
+      Ceiling light
+    Hall
+entities:
+  Ceiling light:
+    entity: light.kitchen_ceiling
+    tap_action:
+      action: toggle
+  Hall:
+    entity: light.hall
+    tap_action:
+      action: navigate
+      navigation_path: /home/hall
+```
 
 An edge is bound by its id. Name it with Mermaid's `@` syntax (`HP e1@--> BOIL`) or use the id the editor lists. While its entity is on, open, heating or a number other than zero, the edge animates in the entity's colour. Its arrowhead takes that colour too. How the edge moves is up to the diagram: Mermaid's [edge animations](https://mermaid.js.org/syntax/flowchart.html#turning-an-animation-on) (`e1@{ animation: slow }`, or a `classDef` with its own `animation`) are kept, and the entity only turns them on and off. Without one, a bound edge moves fast.
 

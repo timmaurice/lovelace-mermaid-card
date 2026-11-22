@@ -81,19 +81,71 @@ function colorMarkers(edge: SVGPathElement, color?: string): void {
   }
 }
 
+/** Something a binding can attach to: its key, and whether it takes the state colour. */
+interface Target {
+  element: SVGElement;
+  key: string;
+  tint: boolean;
+}
+
+/** A label as shown: its text, with line breaks and markup read as spaces. */
+function shownText(element: Element | null | undefined): string {
+  if (!element) return '';
+  const parts: string[] = [];
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) parts.push(walker.currentNode.textContent ?? '');
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
 /**
- * Colours the nodes named in `bindings` after their entity and makes them open more-info.
- * Mermaid gives a node no `data-id`, only a DOM id like `<render id>-flowchart-<node id>-<n>`
- * (`state-…` in state diagrams, `classId-…` in class diagrams), so that is what is matched.
+ * Everything in the diagram a binding can name. Mermaid gives a node no `data-id`, only a DOM id:
+ * `<render id>-flowchart-<node id>-<n>` (`state-…`, `classId-…`), or `<render id>-<id>` for Gantt
+ * tasks and kanban items and columns. Mind maps, pies and sankeys keep no ids of their own, so
+ * their nodes, slices and legend entries are named by their label.
  */
+function findTargets(root: ParentNode): Target[] {
+  const targets: Target[] = [];
+  for (const element of root.querySelectorAll<SVGElement>('.node, .icon-shape, .cluster, rect.task')) {
+    const svgId = element.ownerSVGElement?.id;
+    const key =
+      /-(?:flowchart|state|classId)-(.+)-\d+$/.exec(element.id)?.[1] ??
+      (element.classList.contains('mindmap-node') ? shownText(element) : undefined) ??
+      (svgId && element.id.startsWith(`${svgId}-`) ? element.id.slice(svgId.length + 1) : undefined);
+    if (key) targets.push({ element, key, tint: true });
+  }
+  // Chart colours carry meaning of their own, so slices and sankey nodes only take actions.
+  for (const svg of root.querySelectorAll('svg')) {
+    const labels = svg.querySelectorAll<SVGElement>(':scope .node-labels > text');
+    svg.querySelectorAll<SVGElement>(':scope .nodes > .node').forEach((node, index) => {
+      const label = labels[index];
+      const key = label?.textContent?.split('\n')[0].trim(); // a second line holds the value
+      if (key) targets.push({ element: node, key, tint: false }, { element: label, key, tint: false });
+    });
+    // Mermaid draws no slice that rounds to 0 %, but keeps its legend entry. Slices follow the
+    // legend's order and colour, so a legend entry whose colour the next slice lacks has none.
+    const slices = [...svg.querySelectorAll<SVGElement>('.pieCircle')];
+    const probe = document.createElement('i');
+    let next = 0;
+    for (const legend of svg.querySelectorAll<SVGElement>('.legend')) {
+      const key = shownText(legend).replace(/ \[[^\]]*\]$/, ''); // `showData` adds ` [value]`
+      if (!key) continue;
+      targets.push({ element: legend, key, tint: false });
+      probe.style.fill = slices[next]?.getAttribute('fill') ?? '';
+      if (probe.style.fill && probe.style.fill === legend.querySelector('rect')?.style.fill)
+        targets.push({ element: slices[next++], key, tint: false });
+    }
+  }
+  return targets;
+}
+
+/** Colours the nodes named in `bindings` after their entity and makes them run their actions. */
 export function bindNodes(
   root: ParentNode,
   bindings: Record<string, string | NodeBinding>,
   states: Record<string, HassEntity>,
   onAction: (binding: NodeBinding, action: 'tap' | 'hold') => void,
 ): void {
-  // Icon shapes (`A@{ icon: … }`) are nodes too, but Mermaid gives them their own class.
-  const nodes = [...root.querySelectorAll<SVGGElement>('.node, .icon-shape')];
+  const targets = findTargets(root);
   // Edges carry their id as data-id (clusters do too, but they are not paths).
   const edges = [...root.querySelectorAll<SVGPathElement>('path[data-id]')];
   for (const [nodeId, value] of Object.entries(bindings)) {
@@ -127,17 +179,18 @@ export function bindNodes(
       else edge.style.removeProperty('stroke');
       colorMarkers(edge, color);
     }
-    const pattern = new RegExp(
-      `(?:^|-)(?:flowchart|state|classId)-${nodeId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`,
-    );
-    for (const node of nodes.filter((candidate) => pattern.test(candidate.id))) {
+    for (const { element: node, tint } of targets.filter((target) => target.key === nodeId)) {
       const color = stateColor(entity, binding.active_when);
       // An icon shape has no body to tint, only its frame and label box: its icon takes the colour below.
-      const shapes = node.classList.contains('icon-shape')
-        ? []
-        : node.querySelectorAll<SVGElement>(
-            ':scope > rect, :scope > polygon, :scope > circle, :scope > ellipse, :scope > path, :scope > g > path, :scope > g > rect',
-          );
+      // A Gantt task is a bare rect, its own body.
+      const shapes =
+        !tint || node.classList.contains('icon-shape')
+          ? []
+          : node.tagName === 'rect'
+            ? [node]
+            : node.querySelectorAll<SVGElement>(
+                ':scope > rect, :scope > polygon, :scope > circle, :scope > ellipse, :scope > path, :scope > g > path, :scope > g > rect',
+              );
       for (const shape of shapes) {
         // A tint, not a solid fill: the label keeps the theme's text colour, which a full
         // amber or grey fill made unreadable in dark mode (same idea as the tile card's icon).

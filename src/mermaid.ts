@@ -18,9 +18,19 @@ export interface MermaidApi {
         getStates?(): NodeMap;
         getClasses?(): NodeMap;
         getEdges?(): { id?: string; start: string; end: string }[];
+        getTasks?(): { id: string; task: string }[]; // Gantt
+        getMindmap?(): MindmapNode | null;
+        getSections?(): unknown; // pie: label -> value; Gantt and kanban: a list
+        getData?(): { nodes: { id: string; label?: string }[] }; // kanban (flowcharts have it too)
+        getNodes?(): { ID: string }[]; // sankey
       };
     }>;
   };
+}
+
+interface MindmapNode {
+  descr: string;
+  children: MindmapNode[];
 }
 
 export interface DiagramNode {
@@ -32,9 +42,31 @@ export interface DiagramNode {
   edge?: boolean;
 }
 
+const breaks = (text: string) => text.replace(/<br\s*\/?>/gi, ' ');
+const node = (id: string, text = ''): DiagramNode => ({
+  id,
+  label: text && text !== id ? `${id} – ${text}` : id,
+  text,
+});
+
+/** The keys a binding uses in the other bindable types: task and kanban ids, otherwise labels. */
+function chartNodes(db: Awaited<ReturnType<MermaidApi['mermaidAPI']['getDiagramFromText']>>['db']): DiagramNode[] {
+  if (db.getTasks) return db.getTasks().map((task) => node(task.id, task.task.trim()));
+  if (db.getMindmap) {
+    const walk = (item: MindmapNode | null | undefined): DiagramNode[] =>
+      item ? [node(breaks(item.descr), breaks(item.descr)), ...item.children.flatMap(walk)] : [];
+    return walk(db.getMindmap());
+  }
+  const sections = db.getSections?.();
+  if (sections instanceof Map) return [...sections.keys()].map((label: string) => node(label, label));
+  if (db.getData) return db.getData().nodes.map((item) => node(item.id, item.label));
+  return db.getNodes?.().map((item) => node(item.ID, item.ID)) ?? [];
+}
+
 /**
  * The nodes a diagram defines, read with Mermaid's own parser: flowchart vertices, states and
- * classes — the diagram types whose nodes the card can bind — followed by a flowchart's edges.
+ * classes, followed by a flowchart's edges; Gantt tasks, kanban items, and the labels of mind
+ * map nodes, pie slices and sankey nodes.
  * Anything else, or text that does not parse, yields no nodes; text that does not parse also
  * yields Mermaid's error message. Expects rendered text: Mermaid cannot parse a template.
  */
@@ -49,16 +81,13 @@ export async function listNodes(text: string): Promise<{ nodes: DiagramNode[]; e
     if (error !== undefined) return { nodes: [], error };
     const { db } = await mermaid.mermaidAPI.getDiagramFromText(text);
     const nodes = db.getVertices?.() ?? db.getStates?.() ?? db.getClasses?.();
-    if (!(nodes instanceof Map)) return { nodes: [] };
+    if (!(nodes instanceof Map)) return { nodes: chartNodes(db) };
     const edges = (db.getVertices && db.getEdges?.()) || [];
     return {
       nodes: [
         ...[...nodes]
           .filter(([id]) => !id.startsWith('root_')) // a state diagram's [*] start and end
-          .map(([id, node]) => {
-            const text = String(node.text ?? node.label ?? '').replace(/<br\s*\/?>/gi, ' ');
-            return { id, label: text && text !== id ? `${id} – ${text}` : id, text };
-          }),
+          .map(([id, vertex]) => node(id, breaks(String(vertex.text ?? vertex.label ?? '')))),
         ...edges
           .filter((edge) => edge.id)
           .map((edge) => ({ id: edge.id!, label: `${edge.id} – ${edge.start} → ${edge.end}`, text: '', edge: true })),

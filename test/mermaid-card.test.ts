@@ -136,6 +136,41 @@ describe('bindNodes', () => {
     expect(onAction.mock.calls).toEqual([[binding, 'hold']]);
   });
 
+  it('binds a Gantt task by its id and a mind map node by its label, not by its position', () => {
+    const root = document.createElement('div');
+    root.innerHTML =
+      '<svg id="r1"><rect class="task" id="r1-wash"></rect>' +
+      '<g class="node mindmap-node" id="r1-node_1"><rect></rect><foreignObject><div>Lamp<br>hall</div></foreignObject></g></svg>';
+    const states = { 'light.a': entity('light.a', 'on') };
+    const mindmapNode = root.querySelector<SVGElement>('.mindmap-node')!;
+    bindNodes(root, { node_1: 'light.a' }, states, vi.fn());
+    expect(mindmapNode.getAttribute('role')).toBeNull();
+    bindNodes(root, { wash: 'light.a', 'Lamp hall': 'light.a' }, states, vi.fn());
+    expect(root.querySelector<SVGElement>('rect.task')!.style.getPropertyValue('fill')).toContain('--state-light');
+    expect(mindmapNode.querySelector('rect')!.style.getPropertyValue('fill')).toContain('--state-light');
+    expect(mindmapNode.getAttribute('role')).toBe('button');
+  });
+
+  it('pairs pie slices with their legend entry, past entries Mermaid drew no slice for', () => {
+    const root = document.createElement('div');
+    const legend = (label: string, color: string) =>
+      `<g class="legend"><rect style="fill: ${color}"></rect><text>${label}</text></g>`;
+    root.innerHTML =
+      '<svg><path class="pieCircle" fill="#ff0000"></path><path class="pieCircle" fill="#0000ff"></path>' +
+      legend('Washer [30]', 'rgb(255, 0, 0)') +
+      legend('Tiny [0.1]', 'rgb(0, 255, 0)') +
+      legend('Dryer [70]', 'rgb(0, 0, 255)') +
+      '</svg>';
+    const onAction = vi.fn();
+    bindNodes(root, { Dryer: 'light.a', Tiny: 'light.b' }, {}, onAction);
+    const [washer, dryer] = root.querySelectorAll<SVGElement>('.pieCircle');
+    expect(washer.getAttribute('role')).toBeNull();
+    dryer.dispatchEvent(new MouseEvent('click'));
+    expect(onAction).toHaveBeenCalledWith({ entity: 'light.a' }, 'tap');
+    expect(dryer.style.getPropertyValue('fill')).toBe(''); // a slice keeps its chart colour
+    expect(root.querySelectorAll('.legend')[1].getAttribute('role')).toBe('button'); // Tiny: legend only
+  });
+
   it('keeps the speed or classDef animation the diagram gives an edge, on only while active', () => {
     const root = document.createElement('div');
     root.innerHTML =

@@ -71,6 +71,12 @@ dialog::backdrop {
 svg[aria-roledescription='sankey'] .link {
   mix-blend-mode: normal !important;
 }
+/* What Mermaid draws over a Gantt task, a pie slice or a sankey label must not swallow its tap */
+.taskText,
+text.slice,
+svg[aria-roledescription='sankey'] .links {
+  pointer-events: none;
+}
 @media (prefers-reduced-motion: reduce) {
   /* Every animation, also a classDef's own, which sits inline on the edge */
   .diagram *,
