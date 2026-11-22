@@ -3,18 +3,28 @@ import { property, state } from 'lit/decorators.js';
 import { DIAGRAM_TYPES, EXAMPLES, stripHeader, withHeader } from './header';
 import { localize } from './localize';
 import { DiagramNode, listNodes } from './mermaid';
-import type { HomeAssistant, MermaidCardConfig } from './types';
+import { toBinding } from './entities';
+import type { HomeAssistant, MermaidCardConfig, NodeBinding } from './types';
 
 export const EDITOR_ELEMENT_NAME = 'mermaid-card-editor';
 const MDI_DELETE = 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z';
 
-interface Binding {
+interface Binding extends NodeBinding {
   node: string;
-  entity: string;
 }
 
-const toMap = (rows: Binding[]): Record<string, string> =>
-  Object.fromEntries(rows.filter((row) => row.node && row.entity).map((row) => [row.node, row.entity]));
+/** The config's entities: a plain entity id per node, the long form only where there are actions. */
+const toMap = (rows: Binding[]): Record<string, string | NodeBinding> =>
+  Object.fromEntries(
+    rows
+      .filter((row) => row.node && row.entity)
+      .map(({ node, entity, tap_action, hold_action }) => [
+        node,
+        tap_action || hold_action
+          ? { entity, ...(tap_action && { tap_action }), ...(hold_action && { hold_action }) }
+          : entity,
+      ]),
+  );
 
 export class MermaidCardEditor extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -29,7 +39,7 @@ export class MermaidCardEditor extends LitElement {
     this._config = config;
     // Keep the rows on screen when the config is just our own last change echoed back.
     if (JSON.stringify(toMap(this._rows)) !== JSON.stringify(config.entities ?? {})) {
-      this._rows = Object.entries(config.entities ?? {}).map(([node, entity]) => ({ node, entity }));
+      this._rows = Object.entries(config.entities ?? {}).map(([node, value]) => ({ node, ...toBinding(value) }));
     }
     this._scheduleNodeList(this._source(config));
   }
@@ -236,6 +246,15 @@ export class MermaidCardEditor extends LitElement {
                         },
                       },
                       { name: 'entity', selector: { entity: {} } },
+                    ],
+                  },
+                  {
+                    type: 'expandable',
+                    name: 'actions',
+                    flatten: true,
+                    schema: [
+                      { name: 'tap_action', selector: { ui_action: { default_action: 'more-info' } } },
+                      { name: 'hold_action', selector: { ui_action: { default_action: 'none' } } },
                     ],
                   },
                 ]}

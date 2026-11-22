@@ -1,6 +1,6 @@
 import { LitElement, PropertyValues, css, html, nothing } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
-import { bindNodes } from './entities';
+import { bindNodes, toBinding } from './entities';
 import { loadMermaid } from './mermaid';
 import { EDITOR_ELEMENT_NAME } from './editor';
 import { EXAMPLES, diagramType, withHeader } from './header';
@@ -74,6 +74,11 @@ export class MermaidCard extends LitElement {
     }
     if (config.entities !== undefined && (typeof config.entities !== 'object' || Array.isArray(config.entities))) {
       throw new Error('entities must map Mermaid node ids to entity ids');
+    }
+    for (const value of Object.values(config.entities ?? {})) {
+      if (typeof toBinding(value)?.entity !== 'string') {
+        throw new Error('each entry of entities must be an entity id, or a mapping with an entity');
+      }
     }
     if (config.direction !== undefined && !DIRECTIONS.includes(config.direction)) {
       throw new Error(`direction must be one of ${DIRECTIONS.join(', ')}`);
@@ -212,13 +217,20 @@ export class MermaidCard extends LitElement {
 
   private _bind(): void {
     if (!this._diagram || !this.hass || !this._config?.entities) return;
-    bindNodes(this._diagram, this._config.entities, this.hass.states, (entityId) =>
-      this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId }, bubbles: true, composed: true })),
+    bindNodes(this._diagram, this._config.entities, this.hass.states, (binding, action) =>
+      // Home Assistant runs the action, as for its own cards; a tap opens more-info by default.
+      this.dispatchEvent(
+        new CustomEvent('hass-action', {
+          detail: { config: { tap_action: { action: 'more-info' }, ...binding }, action },
+          bubbles: true,
+          composed: true,
+        }),
+      ),
     );
   }
 
   private _boundStatesChanged(oldHass?: HomeAssistant): boolean {
-    const entities = Object.values(this._config?.entities ?? {});
+    const entities = Object.values(this._config?.entities ?? {}).map((value) => toBinding(value).entity);
     return entities.some((entityId) => oldHass?.states[entityId] !== this.hass?.states[entityId]);
   }
 

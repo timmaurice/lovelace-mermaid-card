@@ -14,6 +14,9 @@
     "entity": "Entität",
     "add_binding": "Knoten binden",
     "remove_binding": "Entfernen",
+    "actions": "Aktionen",
+    "tap_action": "Aktion beim Tippen",
+    "hold_action": "Aktion beim Gedrückthalten",
     "direction_options": {
       "TB": "Von oben nach unten",
       "BT": "Von unten nach oben",

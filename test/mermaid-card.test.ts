@@ -58,7 +58,23 @@ describe('bindNodes', () => {
     a.dispatchEvent(new MouseEvent('click'));
     a.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     expect(onTap).toHaveBeenCalledTimes(2);
-    expect(onTap).toHaveBeenCalledWith('light.a');
+    expect(onTap).toHaveBeenCalledWith({ entity: 'light.a' }, 'tap');
+  });
+
+  it('runs the hold action on a long press instead of the tap', () => {
+    vi.useFakeTimers();
+    const root = document.createElement('div');
+    root.innerHTML = '<svg><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g></svg>';
+    const onAction = vi.fn();
+    const binding = { entity: 'light.a', hold_action: { action: 'toggle' } };
+    bindNodes(root, { A: binding }, {}, onAction);
+    const node = root.querySelector<SVGGElement>('.node')!;
+    node.dispatchEvent(new Event('pointerdown'));
+    vi.advanceTimersByTime(600);
+    node.dispatchEvent(new Event('pointerup'));
+    node.dispatchEvent(new MouseEvent('click'));
+    vi.useRealTimers();
+    expect(onAction.mock.calls).toEqual([[binding, 'hold']]);
   });
 
   it('animates a bound edge while its entity is active', () => {
@@ -246,6 +262,16 @@ describe('MermaidCardEditor', () => {
     expect(emitted.at(-1)!.entities).toEqual({ A: 'light.a', B: 'switch.b' });
     internals(editor)._rowsChanged([]);
     expect(emitted.at(-1)!.entities).toBeUndefined();
+  });
+
+  it('keeps the actions of a binding, writing the long form only where there are some', () => {
+    const editor = new MermaidCardEditor();
+    const emitted: { entities?: Record<string, unknown> }[] = [];
+    editor.addEventListener('config-changed', (event) => emitted.push((event as CustomEvent).detail.config));
+    const entities = { A: { entity: 'light.a', hold_action: { action: 'toggle' } }, B: 'switch.b' };
+    editor.setConfig({ type: 'custom:mermaid-card', content: 'A --> B', entities });
+    internals(editor)._rowsChanged(internals(editor)._rows);
+    expect(emitted.at(-1)!.entities).toEqual(entities);
   });
 
   it('moves a header from the content into the options, and drops defaults', () => {

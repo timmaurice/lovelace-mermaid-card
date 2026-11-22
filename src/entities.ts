@@ -1,4 +1,4 @@
-import type { HassEntity } from './types';
+import type { HassEntity, NodeBinding } from './types';
 
 // States that mean "nothing is happening"; everything else that is not a number counts as active.
 const INACTIVE = new Set(['off', 'closed', 'idle', 'standby', 'not_home', 'locked', 'paused', 'docked', 'disarmed']);
@@ -20,6 +20,13 @@ export function isActive(entity: HassEntity | undefined): boolean {
   return Number(entity.state) !== 0; // NaN for text states, which count as active
 }
 
+/** A binding in its long form, whichever form the config wrote it in. */
+export const toBinding = (value: string | NodeBinding): NodeBinding =>
+  typeof value === 'string' ? { entity: value } : value;
+
+// A press this long is a hold, Home Assistant's own threshold.
+const HOLD_MS = 500;
+
 /**
  * Colours the nodes named in `bindings` after their entity and makes them open more-info.
  * Mermaid gives a node no `data-id`, only a DOM id like `<render id>-flowchart-<node id>-<n>`
@@ -27,15 +34,16 @@ export function isActive(entity: HassEntity | undefined): boolean {
  */
 export function bindNodes(
   root: ParentNode,
-  bindings: Record<string, string>,
+  bindings: Record<string, string | NodeBinding>,
   states: Record<string, HassEntity>,
-  onTap: (entityId: string) => void,
+  onAction: (binding: NodeBinding, action: 'tap' | 'hold') => void,
 ): void {
   const nodes = [...root.querySelectorAll<SVGGElement>('.node')];
   // Edges carry their id as data-id (clusters do too, but they are not paths).
   const edges = [...root.querySelectorAll<SVGPathElement>('path[data-id]')];
-  for (const [nodeId, entityId] of Object.entries(bindings)) {
-    const entity = states[entityId];
+  for (const [nodeId, value] of Object.entries(bindings)) {
+    const binding = toBinding(value);
+    const entity = states[binding.entity];
     for (const edge of edges.filter((candidate) => candidate.dataset.id === nodeId)) {
       // Mermaid's own `animate: true` class, whose CSS every diagram already carries.
       const active = isActive(entity);
@@ -68,12 +76,24 @@ export function bindNodes(
       node.style.cursor = 'pointer';
       node.setAttribute('role', 'button');
       node.setAttribute('tabindex', '0');
-      node.setAttribute('aria-label', entity?.attributes.friendly_name ?? entityId);
-      node.onclick = () => onTap(entityId);
+      node.setAttribute('aria-label', entity?.attributes.friendly_name ?? binding.entity);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let held = false;
+      // A long press only means something when the binding has a hold_action.
+      node.onpointerdown = () => {
+        held = false;
+        clearTimeout(timer);
+        if (binding.hold_action) timer = setTimeout(() => ((held = true), onAction(binding, 'hold')), HOLD_MS);
+      };
+      node.onpointerup = node.onpointerleave = () => clearTimeout(timer);
+      node.onclick = () => {
+        if (!held) onAction(binding, 'tap');
+        held = false;
+      };
       node.onkeydown = (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          onTap(entityId);
+          onAction(binding, 'tap');
         }
       };
     }

@@ -14,6 +14,9 @@
     "entity": "Entity",
     "add_binding": "Bind a node",
     "remove_binding": "Remove",
+    "actions": "Actions",
+    "tap_action": "Tap action",
+    "hold_action": "Hold action",
     "direction_options": {
       "TB": "Top to bottom",
       "BT": "Bottom to top",

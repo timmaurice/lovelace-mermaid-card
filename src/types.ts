@@ -17,6 +17,16 @@ export interface HomeAssistant {
   };
 }
 
+/** A Home Assistant action (tap_action format), passed on to Home Assistant as it is. */
+export type ActionConfig = { action: string; [key: string]: unknown };
+
+/** A node bound to an entity, with the actions a tap or a long press runs. */
+export interface NodeBinding {
+  entity: string;
+  tap_action?: ActionConfig;
+  hold_action?: ActionConfig;
+}
+
 export interface MermaidCardConfig {
   type: string;
   title?: string;
@@ -25,10 +35,10 @@ export interface MermaidCardConfig {
   /** Mermaid diagram type, used when the content has no header line of its own. Default flowchart. */
   diagram_type?: string;
   /**
-   * Mermaid node or edge id → entity id. Bound nodes are coloured by state and open more-info;
-   * bound edges animate while their entity is active.
+   * Mermaid node or edge id → entity id, or a binding with actions. Bound nodes are coloured by
+   * state and open more-info; bound edges animate while their entity is active.
    */
-  entities?: Record<string, string>;
+  entities?: Record<string, string | NodeBinding>;
   /** Overrides a flowchart's direction, e.g. TD for a narrow card. */
   direction?: (typeof DIRECTIONS)[number];
   /** Size in percent of the diagram's natural size; 100 (default) fits it to the card. */
