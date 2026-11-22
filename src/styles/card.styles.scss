@@ -59,6 +59,10 @@ dialog::backdrop {
   margin: 0 auto;
   height: auto;
 }
+/* Mermaid multiplies sankey links onto the background, which a dark card turns black */
+svg[aria-roledescription='sankey'] .link {
+  mix-blend-mode: normal !important;
+}
 @media (prefers-reduced-motion: reduce) {
   /* Every animation, also a classDef's own, which sits inline on the edge */
   .diagram *,
