@@ -10,6 +10,7 @@
  * dashboards of their own, so that playground stays intact.
  */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -178,10 +179,16 @@ export async function onboardIfNeeded(): Promise<void> {
  * it; an instance that already has an entry for the bundle is left untouched.
  */
 export async function ensureBundleResource(): Promise<void> {
-  const pathOf = (url: string) => new URL(url, 'http://ha.invalid').pathname;
-  const existing = await resources();
-  if (existing.some((resource) => pathOf(resource.url) === BUNDLE_URL)) return;
-  await callWebsocket({ type: 'lovelace/resources/create', res_type: 'module', url: BUNDLE_URL });
+  // Home Assistant serves /local with a month of browser cache, so the URL carries the bundle's
+  // hash: a new build is a new URL, and every open browser loads it on its next reload.
+  const hash = createHash('sha1').update(readFileSync(BUNDLE)).digest('hex').slice(0, 8);
+  const url = `${BUNDLE_URL}?v=${hash}`;
+  const pathOf = (value: string) => new URL(value, 'http://ha.invalid').pathname;
+  const existing = (await resources()).find((resource) => pathOf(resource.url) === BUNDLE_URL);
+  if (!existing) await callWebsocket({ type: 'lovelace/resources/create', res_type: 'module', url });
+  else if (existing.url !== url) {
+    await callWebsocket({ type: 'lovelace/resources/update', resource_id: existing.id, res_type: 'module', url });
+  }
 }
 
 export interface Tokens {

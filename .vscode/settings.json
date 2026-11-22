@@ -1,4 +1,15 @@
 {
-  "cSpell.words": ["colour", "dimgray", "gantt", "HACS", "hacsfiles", "hass", "mermaid"],
+  "cSpell.words": [
+    "colour",
+    "dimgray",
+    "gantt",
+    "HACS",
+    "hacsfiles",
+    "hass",
+    "mermaid",
+    "mindmap",
+    "sankey",
+    "xychart"
+  ],
   "cSpell.ignorePaths": [".github/**", "node_modules/**", "dist/**", "de.json"]
 }
