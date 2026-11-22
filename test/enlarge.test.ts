@@ -43,6 +43,7 @@ describe('enlarged view', () => {
     card.shadowRoot!.querySelector<HTMLElement>('.enlarge')!.click();
     const dialog = card.shadowRoot!.querySelector('dialog')!;
     expect(dialog.open).toBe(true);
+    expect(dialog.getAttribute('aria-label')).toBe('Enlarged diagram'); // no title, so the generic name
     expect(dialog.querySelector<SVGSVGElement>('.enlarged svg')!.style.minWidth).toBe('800px');
     const rect = () => dialog.querySelector<SVGRectElement>('.enlarged rect')!;
     expect(rect().style.getPropertyValue('fill')).toContain('inactive');

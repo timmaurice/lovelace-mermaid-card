@@ -1,6 +1,7 @@
 {
   "card": {
     "enlarge": "Enlarge diagram",
+    "enlarged": "Enlarged diagram",
     "close": "Close"
   },
   "editor": {

@@ -325,6 +325,7 @@ export class MermaidCard extends LitElement {
         }
       </ha-card>
       <dialog
+        aria-label=${this._config.title ?? localize(this.hass, 'card.enlarged')}
         @click=${(event: Event) => event.target === this._dialog && this._dialog.close()}
         @close=${() => this._dialog?.querySelector('.enlarged')?.replaceChildren()}
       >
