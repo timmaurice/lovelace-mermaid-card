@@ -55,6 +55,7 @@ entities:                 # optional; node or edge id -> entity
 - Times: `as_local(as_datetime(state_attr('sun.sun', 'next_setting'))).strftime('%H:%M')`, `relative_time(e.last_changed)`, `now()`. Put a repeated expression in a macro: `{% macro t(a) %}…{% endmacro %}`.
 - Collect and sort: `{% set ns = namespace(items=[]) %}{% set ns.items = ns.items + [(key, label)] %}` then `ns.items | sort(attribute='0')`.
 - Use `{%-` / `-%}` to keep template tags from leaving blank lines.
+- Icons: Mermaid's icon shape takes Home Assistant icon names, `HP@{ icon: "mdi:heat-pump", label: "Heat pump" }`, also from a template: `icon: "{{ 'mdi:fan' if is_state('fan.x', 'on') else 'mdi:fan-off' }}"`. In `architecture-beta`: `service db(mdi:database)[Recorder]`, `group home(mdi:home)[Home]`. Prefixes: `mdi:` (every Material Design Icon), `hass:`, and those of custom icon integrations. Other Iconify sets (`logos:`, `fa:`) are not available; an unknown name shows a question mark.
 
 ## Traps
 

@@ -1,6 +1,7 @@
 import { LitElement, PropertyValues, css, html, nothing, unsafeCSS } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
 import { bindNodes, toBinding } from './entities';
+import { registerIcons } from './icons';
 import { loadMermaid } from './mermaid';
 import { EDITOR_ELEMENT_NAME } from './editor';
 import { EXAMPLES, diagramType, withHeader } from './header';
@@ -229,6 +230,7 @@ export class MermaidCard extends LitElement {
         withHeader(text, this._config?.diagram_type, this._config?.direction),
         this._config?.direction,
       );
+      await registerIcons(mermaid, source);
       const { svg, bindFunctions } = await mermaid.render(
         `${ELEMENT_NAME}-${++renderCount}`,
         this._withGanttWidth(source),

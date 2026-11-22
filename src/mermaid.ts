@@ -9,6 +9,8 @@ export interface MermaidApi {
   initialize(config: Record<string, unknown>): void;
   render(id: string, text: string): Promise<{ svg: string; bindFunctions?: (element: Element) => void }>;
   parse(text: string): Promise<unknown>;
+  /** Missing from an older Mermaid that another resource already put on the page. */
+  registerIconPacks?(packs: { name: string; icons: object }[]): void;
   mermaidAPI: {
     getDiagramFromText(text: string): Promise<{
       db: {

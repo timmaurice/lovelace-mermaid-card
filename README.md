@@ -107,6 +107,17 @@ entities:
 
 A diagram shrinks to fit the card down to three quarters of its natural size; beyond that it scrolls sideways, so the text stays readable. For a narrow card, `direction: TD` usually fits better than a wide `LR` flowchart. When a diagram does not fit, a button in the card's corner opens it at full size in a dialog, where bound nodes still work.
 
+### Icons
+
+Mermaid's [icon shapes](https://mermaid.js.org/syntax/flowchart.html#icon-shape) and the icons of an `architecture-beta` diagram take Home Assistant's icon names: `mdi:` (all of Material Design Icons), `hass:` and the prefixes of custom icon integrations. The card fetches just the icons a diagram uses from Home Assistant, so no icon set is bundled. An icon Home Assistant does not know shows as a question mark.
+
+```yaml
+type: custom:mermaid-card
+direction: LR
+content: |
+  HP@{ icon: "mdi:heat-pump", label: "Heat pump" } --> BOIL@{ icon: "mdi:water-boiler", label: "Boiler" }
+```
+
 ### Diagrams built from entities
 
 The whole diagram can come from a template. This Gantt chart shows every switch that is on, from the moment it was switched on until now; it grows each minute and shows a marker when nothing runs:
