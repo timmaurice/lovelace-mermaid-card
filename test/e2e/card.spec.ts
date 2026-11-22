@@ -20,7 +20,14 @@ test.beforeAll(async () => {
         sections: [
           {
             type: 'grid',
-            cards: [{ type: 'custom:mermaid-card', title: 'Heating', content: CONTENT, entities: { HP: PUMP } }],
+            cards: [
+              {
+                type: 'custom:mermaid-card',
+                title: 'Heating',
+                content: CONTENT,
+                entities: { HP: PUMP, L_HP_BOIL_0: PUMP },
+              },
+            ],
           },
         ],
       },
@@ -38,6 +45,8 @@ test('renders live template values and follows the bound entity', async ({ page,
   const card = page.locator('mermaid-card');
   const pump = card.locator('.node[id*="-flowchart-HP-"]');
   const boiler = card.locator('.node[id*="-flowchart-BOIL-"]');
+  // Edges are found by Mermaid's data-id; a Mermaid update that moves it must fail here.
+  const flow = card.locator('path[data-id="L_HP_BOIL_0"]');
   const pumpFill = () =>
     pump
       .locator('path, rect, polygon')
@@ -46,11 +55,13 @@ test('renders live template values and follows the bound entity', async ({ page,
 
   await expect(boiler).toContainText('58.4 °C', { timeout: 30_000 });
   await expect.poll(pumpFill).toContain('--state-switch-inactive-color');
+  await expect(flow).not.toHaveClass(/edge-animation-fast/);
 
   await setState(BOILER, '61.0', { friendly_name: 'E2E boiler', unit_of_measurement: '°C' });
   await setState(PUMP, 'on', { friendly_name: 'E2E heat pump' });
   await expect(boiler).toContainText('61.0 °C');
   await expect.poll(pumpFill).toContain('--state-switch-active-color');
+  await expect(flow).toHaveClass(/edge-animation-fast/);
 
   await pump.click();
   await expect(page.locator('ha-more-info-dialog')).toContainText('E2E heat pump');
@@ -64,8 +75,8 @@ test('the editor lists the diagram nodes for binding', async ({ page }) => {
   const editor = page.locator('mermaid-card-editor');
   await expect(editor).toBeVisible({ timeout: 30_000 });
 
-  // One row for the binding in the config, and both diagram nodes and their edge on offer.
-  await expect(editor.locator('.row')).toHaveCount(1);
+  // One row per binding in the config, and both diagram nodes and their edge on offer.
+  await expect(editor.locator('.row')).toHaveCount(2);
   await expect
     .poll(() =>
       editor.evaluate((element) => (element as unknown as { _nodes: { id: string }[] })._nodes.map((node) => node.id)),
