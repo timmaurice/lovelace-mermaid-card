@@ -92,7 +92,7 @@ export function withHeader(content: string, type = 'flowchart', direction?: stri
  * every installation has (sun.sun) appear, so each example renders as it is.
  */
 export const EXAMPLES: Record<(typeof DIAGRAM_TYPES)[number], string> = {
-  flowchart: `  SUN(["Sun<br>{{ states('sun.sun') }}"]) --> HOME[Home]
+  flowchart: `  SUN(["Sun<br>{{ state_translated('sun.sun') }}"]) --> HOME[Home]
   HOME --> DARK{Dark outside?}
   DARK -->|yes| SCENE[Evening scene]
   DARK -->|no| NOTHING[Nothing to do]`,
