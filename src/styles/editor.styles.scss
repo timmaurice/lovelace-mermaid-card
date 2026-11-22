@@ -1,0 +1,27 @@
+.bindings {
+  margin-top: 24px;
+}
+h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.helper {
+  margin: 0 0 12px;
+  color: var(--secondary-text-color);
+  font-size: 0.875rem;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.row ha-form {
+  flex: 1;
+}
+.stale {
+  margin: -4px 0 8px;
+  color: var(--warning-color);
+  font-size: 0.875rem;
+}

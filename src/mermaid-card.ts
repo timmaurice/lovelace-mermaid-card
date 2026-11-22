@@ -1,10 +1,11 @@
-import { LitElement, PropertyValues, css, html, nothing } from 'lit';
+import { LitElement, PropertyValues, css, html, nothing, unsafeCSS } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
 import { bindNodes, toBinding } from './entities';
 import { loadMermaid } from './mermaid';
 import { EDITOR_ELEMENT_NAME } from './editor';
 import { EXAMPLES, diagramType, withHeader } from './header';
 import { localize } from './localize';
+import cardStyles from './styles/card.styles.scss';
 import { DIRECTIONS, TEMPLATE, type HomeAssistant, type MermaidCardConfig } from './types';
 
 const ELEMENT_NAME = 'mermaid-card';
@@ -341,74 +342,7 @@ export class MermaidCard extends LitElement {
   }
 
   static styles = css`
-    :host {
-      display: block; /* an inline host reports no size to the ResizeObserver */
-    }
-    ha-card {
-      position: relative;
-      overflow: hidden;
-    }
-    ha-alert {
-      display: block;
-      margin: 0 16px 16px;
-    }
-    .diagram {
-      padding: 16px;
-      overflow-x: auto;
-    }
-    ha-card[header] .diagram {
-      padding-top: 0;
-    }
-    ha-card:not([header]) .diagram.shrunk {
-      padding-top: 48px; /* room for the enlarge button, which would cover the diagram's corner */
-    }
-    .diagram svg {
-      display: block;
-      margin: 0 auto; /* not flex centring: that would cut off the left edge once it scrolls */
-      max-width: 100%;
-      height: auto;
-    }
-    .diagram .node[role='button']:focus-visible,
-    .enlarged .node[role='button']:focus-visible {
-      outline: 2px solid var(--primary-color);
-    }
-    .enlarge,
-    .close {
-      position: absolute;
-      top: 4px;
-      inset-inline-end: 4px;
-      color: var(--secondary-text-color);
-    }
-    dialog {
-      padding: 0; /* .enlarged fills it, so a click that lands on the dialog itself is on the backdrop */
-      border: none;
-      border-radius: var(--ha-card-border-radius, 12px);
-      max-width: calc(100vw - 32px);
-      max-height: calc(100vh - 32px);
-      background: var(--ha-card-background, var(--card-background-color, #fff));
-      color: var(--primary-text-color);
-    }
-    dialog::backdrop {
-      background: rgba(0, 0, 0, 0.6);
-    }
-    .enlarged {
-      box-sizing: border-box;
-      max-height: inherit;
-      overflow: auto;
-      padding: 48px 16px 16px;
-    }
-    .enlarged svg {
-      display: block;
-      margin: 0 auto;
-      height: auto;
-    }
-    @media (prefers-reduced-motion: reduce) {
-      /* Every animation, also a classDef's own, which sits inline on the edge */
-      .diagram *,
-      .enlarged * {
-        animation: none !important;
-      }
-    }
+    ${unsafeCSS(cardStyles)}
   `;
 }
 

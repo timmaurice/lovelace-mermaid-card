@@ -1,7 +1,8 @@
-import { LitElement, css, html, nothing } from 'lit';
+import { LitElement, css, html, nothing, unsafeCSS } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { DIAGRAM_TYPES, EXAMPLES, stripHeader, withHeader } from './header';
 import { localize } from './localize';
+import editorStyles from './styles/editor.styles.scss';
 import { DiagramNode, listNodes } from './mermaid';
 import { toBinding } from './entities';
 import { TEMPLATE, type HassEntity, type HomeAssistant, type MermaidCardConfig, type NodeBinding } from './types';
@@ -387,33 +388,7 @@ export class MermaidCardEditor extends LitElement {
   }
 
   static styles = css`
-    .bindings {
-      margin-top: 24px;
-    }
-    h3 {
-      margin: 0 0 4px;
-      font-size: 1rem;
-      font-weight: 500;
-    }
-    .helper {
-      margin: 0 0 12px;
-      color: var(--secondary-text-color);
-      font-size: 0.875rem;
-    }
-    .row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .row ha-form {
-      flex: 1;
-    }
-    .stale {
-      margin: -4px 0 8px;
-      color: var(--warning-color);
-      font-size: 0.875rem;
-    }
+    ${unsafeCSS(editorStyles)}
   `;
 }
 

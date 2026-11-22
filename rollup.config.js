@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import process from 'node:process';
+import { compile } from 'sass';
+import litCss from 'rollup-plugin-lit-css';
 import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
 import nodeResolve from '@rollup/plugin-node-resolve';
@@ -55,6 +58,11 @@ export default {
   plugins: [
     mermaidSourcePlugin(),
     nodeResolve(),
+    litCss({
+      include: ['**/*.scss'],
+      transform: (data, { filePath }) =>
+        compile(filePath, { style: dev ? 'expanded' : 'compressed', loadPaths: [path.dirname(filePath)] }).css,
+    }),
     json({ compact: true }),
     typescript({ sourceMap: dev, inlineSources: dev }),
     !dev && terser({ format: { comments: false } }),
