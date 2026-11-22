@@ -304,28 +304,34 @@ test.beforeAll(async () => {
 });
 
 test('every catalog diagram renders', async ({ page, consoleErrors }) => {
+  const configs = CATALOG.map((card) => ({ type: 'custom:mermaid-card', ...card, file: undefined })); // JSON drops it
   const urlPath = await useDashboard('catalog', {
     views: [
+      // To browse: each card on its own.
+      { title: 'Catalog', path: 'catalog', cards: configs },
+      // To photograph: one column, so every card has the same width and wide types fit.
       {
-        title: 'Catalog',
+        title: 'Screenshots',
+        path: 'screenshots',
+        subview: true,
         type: 'panel',
-        cards: [
-          {
-            type: 'vertical-stack',
-            cards: CATALOG.map((card) => ({ type: 'custom:mermaid-card', ...card, file: undefined })), // JSON drops it
-          },
-        ],
+        cards: [{ type: 'vertical-stack', cards: configs }],
       },
     ],
   });
   // Narrow enough that the sidebar folds away, wide enough for the wide types to fit.
   await page.setViewportSize({ width: 820, height: 900 });
-  await page.goto(`/${urlPath}/0`);
   const cards = page.locator('mermaid-card');
-  await expect(cards.locator('svg[aria-roledescription]')).toHaveCount(CATALOG.length, { timeout: 60_000 });
-  await expect(cards.locator('ha-alert')).toHaveCount(0);
+  const rendered = async (view: string) => {
+    await page.goto(`/${urlPath}/${view}`);
+    await expect(cards.locator('svg[aria-roledescription]')).toHaveCount(CATALOG.length, { timeout: 60_000 });
+    await expect(cards.locator('ha-alert')).toHaveCount(0);
+  };
+  await rendered('catalog');
   expect(consoleErrors).toEqual([]);
   if (!process.env.CATALOG) return;
+
+  await rendered('screenshots');
 
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
