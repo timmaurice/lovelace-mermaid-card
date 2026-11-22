@@ -45,7 +45,7 @@ export interface MermaidCardConfig {
   title?: string;
   /** Mermaid source; may contain Home Assistant templates. Its first line may name the type. */
   content?: string;
-  /** Experimental, instead of content: an automation entity, drawn with the path of its last run. */
+  /** Instead of content: an automation entity, drawn with the path of its last run. */
   automation?: string;
   /** Mermaid diagram type, used when the content has no header line of its own. Default flowchart. */
   diagram_type?: string;
