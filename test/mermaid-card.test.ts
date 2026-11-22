@@ -79,6 +79,23 @@ describe('bindNodes', () => {
     expect(onAction.mock.calls).toEqual([[binding, 'hold']]);
   });
 
+  it('keeps the speed or classDef animation the diagram gives an edge, on only while active', () => {
+    const root = document.createElement('div');
+    root.innerHTML =
+      '<svg><path data-id="slow" class="edge-animation-slow"></path>' +
+      '<path data-id="own" style="animation: dash 25s linear infinite"></path></svg>';
+    const [slow, own] = root.querySelectorAll<SVGPathElement>('path');
+    const bind = (state: string) =>
+      bindNodes(root, { slow: 'switch.p', own: 'switch.p' }, { 'switch.p': entity('switch.p', state) }, vi.fn());
+
+    bind('off');
+    expect(slow.getAttribute('class')).toBe('');
+    expect(own.style.animation).toBe('none');
+    bind('on');
+    expect(slow.getAttribute('class')).toBe('edge-animation-slow');
+    expect(own.style.animation).toMatch(/\bdash\b/); // the classDef's own animation again
+  });
+
   it('animates a bound edge while its entity is active', () => {
     const root = document.createElement('div');
     root.innerHTML =

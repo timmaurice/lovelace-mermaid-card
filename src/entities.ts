@@ -78,8 +78,14 @@ export function bindNodes(
     const entity = states[binding.entity];
     for (const edge of edges.filter((candidate) => candidate.dataset.id === nodeId)) {
       const color = isActive(entity) ? (stateColor(entity) ?? 'var(--state-active-color)') : undefined;
-      // Mermaid's own `animate: true` class, whose CSS every diagram already carries.
-      edge.classList.toggle('edge-animation-fast', Boolean(color));
+      // The entity only turns the animation on and off; how it moves is the diagram's choice:
+      // `animation: slow`, a classDef's own animation (inline on the path), or else fast.
+      const own = (edge.dataset.ownAnimation ??= edge.classList.contains('edge-animation-slow')
+        ? 'slow'
+        : edge.style.animation || 'fast');
+      edge.classList.toggle('edge-animation-fast', Boolean(color) && own === 'fast');
+      edge.classList.toggle('edge-animation-slow', Boolean(color) && own === 'slow');
+      if (own !== 'fast' && own !== 'slow') edge.style.animation = color ? own : 'none';
       if (color) edge.style.setProperty('stroke', color, 'important');
       else edge.style.removeProperty('stroke');
       colorMarkers(edge, color);

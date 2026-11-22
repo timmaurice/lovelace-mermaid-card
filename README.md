@@ -40,12 +40,13 @@ entities:
 
 A bound node takes its entity's state colour. A tap opens more-info unless the binding sets a `tap_action`; a long press runs its `hold_action`. Both take Home Assistant's usual [actions](https://www.home-assistant.io/dashboards/actions/) (`toggle`, `navigate`, `perform-action`, …).
 
-An edge is bound by its id. Name it with Mermaid's `@` syntax (`HP e1@--> BOIL`) or use the id the editor lists. While its entity is on, open, heating or a number other than zero, the edge animates in the entity's colour. Its arrowhead takes that colour too.
+An edge is bound by its id. Name it with Mermaid's `@` syntax (`HP e1@--> BOIL`) or use the id the editor lists. While its entity is on, open, heating or a number other than zero, the edge animates in the entity's colour. Its arrowhead takes that colour too. How the edge moves is up to the diagram: Mermaid's [edge animations](https://mermaid.js.org/syntax/flowchart.html#turning-an-animation-on) (`e1@{ animation: slow }`, or a `classDef` with its own `animation`) are kept, and the entity only turns them on and off. Without one, a bound edge moves fast.
 
 ```yaml
 type: custom:mermaid-card
 content: |
   PUMP[Heat pump] flow@--> BOIL[Boiler]
+  flow@{ animation: slow }
 entities:
   PUMP:
     entity: switch.heat_pump
