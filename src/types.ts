@@ -9,7 +9,9 @@ export interface HassEntity {
 export interface HomeAssistant {
   language?: string;
   states: Record<string, HassEntity>;
-  themes: { darkMode: boolean };
+  themes: { darkMode: boolean; theme?: string };
+  /** The user's own theme choice, which overrides themes.theme. */
+  selectedTheme?: { theme?: string } | null;
   connection: {
     subscribeMessage<T>(callback: (message: T) => void, params: Record<string, unknown>): Promise<() => Promise<void>>;
   };

@@ -84,6 +84,18 @@ describe('MermaidCard', () => {
     card.remove();
   });
 
+  it('draws the diagram again in the colours of a new theme', async () => {
+    const card = new MermaidCard();
+    card.setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR\n A --> B' });
+    card.hass = makeHass({});
+    document.body.append(card);
+    await vi.waitFor(() => expect(card.shadowRoot!.querySelector('svg')).not.toBeNull());
+    const renders = render.mock.calls.length;
+    card.hass = { ...makeHass({}), themes: { darkMode: false, theme: 'nord' } };
+    await vi.waitFor(() => expect(render.mock.calls.length).toBe(renders + 1));
+    card.remove();
+  });
+
   it('adds the header from the options when the content has none', async () => {
     const card = new MermaidCard();
     card.setConfig({ type: 'custom:mermaid-card', content: '  A --> B', direction: 'TB' });

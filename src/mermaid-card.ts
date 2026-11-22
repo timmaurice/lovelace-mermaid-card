@@ -128,7 +128,9 @@ export class MermaidCard extends LitElement {
     // A Gantt chart is drawn for one width; the first render often sees the card before its layout.
     const gantt =
       this._text !== undefined && diagramType(withHeader(this._text, this._config.diagram_type)) === 'gantt';
-    const key = `${this.hass.themes?.darkMode}\n${this._text}${gantt ? `\n${this._width}` : ''}`;
+    const { themes, selectedTheme } = this.hass;
+    const theme = `${selectedTheme?.theme ?? themes?.theme}/${themes?.darkMode}`; // colours come from the theme
+    const key = `${theme}\n${this._text}${gantt ? `\n${this._width}` : ''}`;
     if (this._text !== undefined && key !== this._renderedKey) {
       this._renderedKey = key;
       void this._renderDiagram(this._text);
