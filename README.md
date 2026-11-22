@@ -9,7 +9,7 @@
 
 A Home Assistant Lovelace card that renders [Mermaid](https://mermaid.js.org/) diagrams — flowcharts, state, sequence, class, Gantt and more — styled with your Home Assistant theme and kept live with your entity states.
 
-<img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/screenshot.png" alt="Mermaid Card Screenshot" width="500">
+<img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/animation.webp" alt="Mermaid Card: a heating and energy flowchart whose bound nodes change colour and whose edges move with the live states" width="700">
 
 ## Features
 
