@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    // The end-to-end specs are Playwright's, not Vitest's.
-    exclude: ['**/node_modules/**', '**/dist/**', 'test/e2e/**'],
+    // The end-to-end specs are Playwright's, not Vitest's; agent worktrees hold copies of the repo.
+    exclude: ['**/node_modules/**', '**/dist/**', 'test/e2e/**', '.claude/**'],
   },
 });
