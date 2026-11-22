@@ -128,6 +128,8 @@ content: |
 
 Narrow the loop to what you want to see: `expand(label_entities('laundry'))` or `expand('switch.washer', 'switch.dryer')` in place of `states.switch`. A colon in a task name ends it in Mermaid, hence the `replace`.
 
+Home Assistant trims the rendered template, so its first line loses any indentation. Where indentation means structure (mind map, kanban), indent relative to that first line: put the top level at the start of the line.
+
 Mermaid's hexagon shape `A{{text}}` collides with template syntax. Wrap such a diagram in `{% raw %}…{% endraw %}` or write the braces as `{{ '{{' }}` and `{{ '}}' }}`.
 
 ## Development
