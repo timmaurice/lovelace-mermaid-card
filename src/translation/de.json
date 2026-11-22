@@ -3,13 +3,19 @@
     "title": "Titel",
     "content": "Diagramm",
     "content_helper": "Mermaid-Quelltext. Templates wie {{ states(...) }} werden live gerendert.",
-    "direction": "Flussrichtung",
-    "direction_helper": "Überschreibt die Richtung im Diagramm, z. B. TD für schmale Karten.",
+    "direction": "Diagrammrichtung",
+    "direction_helper": "Überschreibt die Richtung eines Flowcharts. Von oben nach unten passt meist am besten in schmale Karten.",
     "bindings": "Gebundene Knoten",
     "bindings_helper": "Gebundene Knoten werden nach dem Zustand ihrer Entität eingefärbt; Tippen öffnet die Details.",
     "node": "Knoten",
     "entity": "Entität",
     "add_binding": "Knoten binden",
-    "remove_binding": "Entfernen"
+    "remove_binding": "Entfernen",
+    "direction_options": {
+      "TB": "Von oben nach unten",
+      "BT": "Von unten nach oben",
+      "LR": "Von links nach rechts",
+      "RL": "Von rechts nach links"
+    }
   }
 }

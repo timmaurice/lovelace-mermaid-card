@@ -181,6 +181,7 @@ describe('localize', () => {
   it('uses the user language, then English, then the key', () => {
     expect(localize({ language: 'de' }, 'editor.bindings')).toBe('Gebundene Knoten');
     expect(localize({ language: 'fr' }, 'editor.bindings')).toBe('Bound nodes');
+    expect(localize({ language: 'de' }, 'editor.direction_options.LR')).toBe('Von links nach rechts');
     expect(localize(undefined, 'editor.nope')).toBe('editor.nope');
   });
 });

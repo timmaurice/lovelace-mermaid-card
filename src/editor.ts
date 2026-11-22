@@ -2,7 +2,7 @@ import { LitElement, css, html, nothing } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { localize } from './localize';
 import { DiagramNode, listNodes } from './mermaid';
-import { DIRECTIONS, type HomeAssistant, type MermaidCardConfig } from './types';
+import type { HomeAssistant, MermaidCardConfig } from './types';
 
 export const EDITOR_ELEMENT_NAME = 'mermaid-card-editor';
 const MDI_DELETE = 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z';
@@ -118,13 +118,24 @@ export class MermaidCardEditor extends LitElement {
     return html`
       <ha-form
         .hass=${this.hass}
-        .data=${this._config}
+        .data=${
+          // TD is Mermaid's alias for TB; the dropdown offers each direction once.
+          this._config.direction === 'TD' ? { ...this._config, direction: 'TB' } : this._config
+        }
         .schema=${[
           { name: 'title', selector: { text: {} } },
           { name: 'content', required: true, selector: { template: {} } },
           {
             name: 'direction',
-            selector: { select: { mode: 'dropdown', options: DIRECTIONS.map((value) => ({ value, label: value })) } },
+            selector: {
+              select: {
+                mode: 'dropdown',
+                options: ['TB', 'BT', 'LR', 'RL'].map((value) => ({
+                  value,
+                  label: localize(this.hass, `editor.direction_options.${value}`),
+                })),
+              },
+            },
           },
         ]}
         .computeLabel=${this._label}
