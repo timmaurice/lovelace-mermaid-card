@@ -1,12 +1,17 @@
 # Dependencies
 /node_modules
 
+# Lockfiles for other package managers
+bun.lock
+yarn.lock
+
 # Build output — built fresh by the release workflow and shipped as a release asset
 dist/
 
 .DS_Store
 
-# Local AI context
+# Local AI context, and Claude Code's files (agent worktrees hold copies of the repo)
+.claude/
 CLAUDE.md
 GEMINI.md
 
