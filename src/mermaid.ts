@@ -43,6 +43,8 @@ export interface DiagramNode {
 }
 
 const breaks = (text: string) => text.replace(/<br\s*\/?>/gi, ' ');
+// A mind map label as the card matches it: as shown, without its markdown's * and backticks.
+const shown = (text: string) => breaks(text).replace(/[*`]/g, '');
 const node = (id: string, text = ''): DiagramNode => ({
   id,
   label: text && text !== id ? `${id} – ${text}` : id,
@@ -54,7 +56,7 @@ function chartNodes(db: Awaited<ReturnType<MermaidApi['mermaidAPI']['getDiagramF
   if (db.getTasks) return db.getTasks().map((task) => node(task.id, task.task.trim()));
   if (db.getMindmap) {
     const walk = (item: MindmapNode | null | undefined): DiagramNode[] =>
-      item ? [node(breaks(item.descr), breaks(item.descr)), ...item.children.flatMap(walk)] : [];
+      item ? [node(shown(item.descr), shown(item.descr)), ...item.children.flatMap(walk)] : [];
     return walk(db.getMindmap());
   }
   const sections = db.getSections?.();

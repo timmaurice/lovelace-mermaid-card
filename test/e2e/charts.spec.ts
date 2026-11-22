@@ -110,10 +110,12 @@ test('the editor lists ids and labels as binding keys for every bindable type', 
       editor.remove();
       return editor._nodes.map((node) => node.id);
     }, content);
-  expect(await nodes('mindmap\nroot((Home))\n  kitchen[Kitchen<br>down]\n  hall("Lamp (hall)")')).toEqual([
+  // As the node shows it: a line break is a space, markdown is its text.
+  expect(await nodes('mindmap\nroot((Home))\n  kitchen[Kitchen<br>down]\n  hall("Lamp (hall)")\n  **Bath**')).toEqual([
     'Home',
     'Kitchen down',
     'Lamp (hall)',
+    'Bath',
   ]);
   expect(await nodes('pie\n  "Washer" : 30\n  "Dryer" : 70')).toEqual(['Washer', 'Dryer']);
   expect(await nodes('gantt\n  dateFormat YYYY-MM-DD\n  Wash :wash, 2026-01-01, 1d')).toEqual(['wash']);
