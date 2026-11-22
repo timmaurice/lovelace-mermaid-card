@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "watch": "rollup -c -w",
     "pretest:e2e": "node scripts/ensure-deps.mjs && npm run build",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "catalog": "npm run build && CATALOG=1 playwright test catalog.spec.ts"
   },
   "type": "module",
   "devDependencies": {

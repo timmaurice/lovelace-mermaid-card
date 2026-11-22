@@ -33,6 +33,46 @@ A Home Assistant Lovelace card that renders [Mermaid](https://mermaid.js.org/) d
 
 Any Mermaid an assistant writes can go straight into `content` (or into a sensor attribute the template reads). Point your assistant at [`llms.txt`](llms.txt): the config, how bindings behave, template patterns, the traps, and a tested example for every diagram type.
 
+## Catalog
+
+Nineteen of Mermaid's diagram types, each on live Home Assistant states. Where the type allows it, nodes are bound to entities: they take the state colour and run an action on tap. The YAML of every card is in [`test/e2e/catalog.spec.ts`](test/e2e/catalog.spec.ts); the end-to-end tests render all of them, and `npm run catalog` takes these screenshots again.
+
+<table>
+  <tr>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/flowchart.webp" alt="Flowchart: icons, live values, edges that move with the power"><br><b>Flowchart</b><br><sub>icons, live values, edges that move with the power</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/state.webp" alt="State diagram: the robot vacuum's current state lit with <code>active_when</code>"><br><b>State diagram</b><br><sub>the robot vacuum's current state lit with <code>active_when</code></sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/mindmap.webp" alt="Mind map: lights bound by label, coloured by state"><br><b>Mind map</b><br><sub>lights bound by label, coloured by state</sub></td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/pie.webp" alt="Pie chart: live power per device, slices tappable"><br><b>Pie chart</b><br><sub>live power per device, slices tappable</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/sankey.webp" alt="Sankey: where the power goes, live"><br><b>Sankey</b><br><sub>where the power goes, live</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/gantt.webp" alt="Gantt: appliance runs, bound by task id"><br><b>Gantt</b><br><sub>appliance runs, bound by task id</sub></td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/kanban.webp" alt="Kanban: chores from <code>input_boolean</code>s, tap to toggle"><br><b>Kanban</b><br><sub>chores from <code>input_boolean</code>s, tap to toggle</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/sequence.webp" alt="Sequence diagram: motion to light, with live states"><br><b>Sequence diagram</b><br><sub>motion to light, with live states</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/timeline.webp" alt="Timeline: today's sunrise and sunset from <code>sun.sun</code>"><br><b>Timeline</b><br><sub>today's sunrise and sunset from <code>sun.sun</code></sub></td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/xychart.webp" alt="XY chart: room temperatures"><br><b>XY chart</b><br><sub>room temperatures</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/quadrant.webp" alt="Quadrant chart: batteries: level against use"><br><b>Quadrant chart</b><br><sub>batteries: level against use</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/radar.webp" alt="Radar: room comfort"><br><b>Radar</b><br><sub>room comfort</sub></td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/treemap.webp" alt="Treemap: power by device"><br><b>Treemap</b><br><sub>power by device</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/class.webp" alt="Class diagram: a thermostat's attributes"><br><b>Class diagram</b><br><sub>a thermostat's attributes</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/er.webp" alt="Entity relationship: how Home Assistant is built"><br><b>Entity relationship</b><br><sub>how Home Assistant is built</sub></td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/journey.webp" alt="User journey: coming home, scored by states"><br><b>User journey</b><br><sub>coming home, scored by states</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/block.webp" alt="Block diagram: the energy system with its total"><br><b>Block diagram</b><br><sub>the energy system with its total</sub></td>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/architecture.webp" alt="Architecture: the home network with MDI icons"><br><b>Architecture</b><br><sub>the home network with MDI icons</sub></td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="https://raw.githubusercontent.com/timmaurice/lovelace-mermaid-card/main/docs/catalog/gitgraph.webp" alt="Git graph: config history"><br><b>Git graph</b><br><sub>config history</sub></td>
+  </tr>
+</table>
+
 ## Localization
 
 The editor is available in English and German. Contributions of further languages are welcome: add a file to `src/translation/` and import it in `src/localize.ts`.
@@ -258,6 +298,8 @@ npm ci && npx playwright install chromium && npm run test:e2e
 ```
 
 Global setup builds the card, starts the compose Home Assistant, onboards it through the API (user `admin` / `password`) and registers the bundle as a Lovelace resource. CI runs the same thing in `.github/workflows/e2e.yml`.
+
+`npm run catalog` renders the [catalog](#catalog) the same way and writes its screenshots to `docs/catalog` (needs `cwebp`).
 
 </details>
 
