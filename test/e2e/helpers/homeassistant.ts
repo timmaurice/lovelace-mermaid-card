@@ -67,16 +67,23 @@ function assertBundleIsCurrent(): void {
 /** Seeds a missing config; returns whether an existing one had to change, which needs a restart. */
 function seedConfig(): boolean {
   const config = resolve(CONFIG_DIR, 'configuration.yaml');
-  if (!existsSync(config)) {
+  const fresh = !existsSync(config);
+  if (fresh) {
     mkdirSync(CONFIG_DIR, { recursive: true });
     copyFileSync(CONFIG_SEED, config);
   }
+  let changed = false;
   const automations = resolve(CONFIG_DIR, 'automations.yaml');
-  if (!existsSync(automations)) writeFileSync(automations, '[]\n');
+  if (!existsSync(automations)) {
+    writeFileSync(automations, '[]\n');
+    changed = !fresh; // a Home Assistant already started on this config failed to load its include
+  }
   // A config seeded before the automation spec existed does not load automations yet.
-  if (readFileSync(config, 'utf8').includes('automations.yaml')) return false;
-  appendFileSync(config, '\nautomation: !include automations.yaml\n');
-  return true;
+  if (!readFileSync(config, 'utf8').includes('automations.yaml')) {
+    appendFileSync(config, '\nautomation: !include automations.yaml\n');
+    changed = true;
+  }
+  return changed;
 }
 
 /** Brings the repository's own compose environment up if it is not running. */

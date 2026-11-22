@@ -49,6 +49,7 @@ jobs:
         run: |
           mkdir -p test/ha-config
           cp test/e2e/ha-seed/configuration.yaml test/ha-config/configuration.yaml
+          echo '[]' > test/ha-config/automations.yaml # the seed config includes it
           docker compose up -d
 
       - name: Wait for Home Assistant
