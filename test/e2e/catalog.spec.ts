@@ -3,7 +3,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/hass';
-import { removeState, setState, useDashboard } from './helpers/homeassistant';
+import { setState, useDashboard } from './helpers/homeassistant';
 
 // The README's catalog: one card per diagram type, each on live demo states with what the card
 // adds where the type allows it (templates, bindings, moving edges, icons). Every run checks
@@ -59,10 +59,10 @@ const CATALOG: Card[] = [
   HOME hp@--> HP
   HOME wash@--> WASH`,
     entities: {
-      solar: { entity: 'sensor.solar_power', speed: 'auto' },
-      grid: { entity: 'sensor.grid_power', speed: 'auto' },
-      hp: { entity: 'sensor.heat_pump_power', speed: 'auto' },
-      wash: { entity: 'sensor.washer_power', speed: 'auto' },
+      solar: { entity: 'sensor.solar_power', speed: 'auto', max: 4000 },
+      grid: { entity: 'sensor.grid_power', speed: 'auto', max: 4000 },
+      hp: { entity: 'sensor.heat_pump_power', speed: 'auto', max: 4000 },
+      wash: { entity: 'sensor.washer_power', speed: 'auto', max: 4000 },
       HP: 'switch.heat_pump',
       WASH: 'switch.washer',
     },
@@ -297,12 +297,9 @@ xychart-beta
   },
 ];
 
+// The states stay after the run, so the catalog dashboard keeps working when shown in the sidebar.
 test.beforeAll(async () => {
   for (const [entityId, state, attributes] of STATES) await setState(entityId, state, attributes);
-});
-
-test.afterAll(async () => {
-  for (const [entityId] of STATES) await removeState(entityId);
 });
 
 test('every catalog diagram renders', async ({ page, consoleErrors }) => {
@@ -331,11 +328,16 @@ test('every catalog diagram renders', async ({ page, consoleErrors }) => {
 
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
-  await page.waitForTimeout(1500); // icons arrive after the first render; moving edges settle
-  for (const [index, { file }] of CATALOG.entries()) {
-    const png = resolve(OUT, `${file}.png`);
-    await cards.nth(index).locator('ha-card').screenshot({ path: png, animations: 'disabled' });
-    execFileSync('cwebp', ['-quiet', '-q', '85', png, '-o', resolve(OUT, `${file}.webp`)]);
-    rmSync(png);
+  // Both themes: the README shows GitHub's dark mode the dark ones.
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.waitForTimeout(1500); // the theme re-renders the diagrams; icons and moving edges settle
+    for (const [index, { file }] of CATALOG.entries()) {
+      const name = scheme === 'dark' ? `${file}-dark` : file;
+      const png = resolve(OUT, `${name}.png`);
+      await cards.nth(index).locator('ha-card').screenshot({ path: png, animations: 'disabled' });
+      execFileSync('cwebp', ['-quiet', '-q', '85', png, '-o', resolve(OUT, `${name}.webp`)]);
+      rmSync(png);
+    }
   }
 });
