@@ -309,7 +309,7 @@ export class MermaidCard extends LitElement {
   }
 
   /** Mermaid's "base" theme, recoloured with the active Home Assistant theme. */
-  private _themeVariables(): Record<string, string> {
+  private _themeVariables(): Record<string, string | Record<string, string>> {
     const style = getComputedStyle(this);
     const read = (name: string) => style.getPropertyValue(name).trim();
     const vars: Record<string, string> = {
@@ -333,17 +333,20 @@ export class MermaidCard extends LitElement {
     };
     // Pie slices, mind map branches and timeline sections each take a colour of their own. Mermaid
     // derives them from primaryColor, which a card background makes near black; HA's palette instead.
-    PALETTE.forEach(([name, fallback], index) => {
-      const color = read(name) || fallback;
-      vars[`pie${index + 1}`] = color;
-      vars[`cScale${index}`] = color;
+    const colors = PALETTE.map(([name, fallback]) => read(name) || fallback);
+    // Pies and colour scales go up to 12; past the palette's 8 they start over instead of black.
+    for (let index = 0; index < 12; index++) {
+      vars[`pie${index + 1}`] = vars[`cScale${index}`] = colors[index % colors.length];
       vars[`cScaleLabel${index}`] = '#ffffff';
+    }
+    colors.forEach((color, index) => {
       // git0 is also the mind map's root, gitBranchLabel0 its text.
       vars[`git${index}`] = color;
       vars[`gitBranchLabel${index}`] = '#ffffff';
       vars[`fillType${index}`] = color; // user journey sections
     });
-    return Object.fromEntries(Object.entries(vars).filter(([, value]) => value));
+    const xyChart = { plotColorPalette: colors.join(',') }; // its own default is pale pastels
+    return { ...Object.fromEntries(Object.entries(vars).filter(([, value]) => value)), xyChart };
   }
 
   protected render() {

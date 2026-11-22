@@ -153,6 +153,8 @@ describe('MermaidCard', () => {
     const vars = (new MermaidCard() as unknown as { _themeVariables(): Record<string, string> })._themeVariables();
     expect([vars.git0, vars.gitBranchLabel0, vars.git7]).toEqual(['#2196f3', '#ffffff', '#3f51b5']); // jsdom: fallbacks
     expect(vars.fillType1).toBe('#ff6f22');
+    expect([vars.pie9, vars.cScale11]).toEqual(['#2196f3', '#926bc7']); // past the palette, it starts over
+    expect(vars.xyChart).toEqual({ plotColorPalette: expect.stringMatching(/^#2196f3,#ff6f22,/) });
   });
 
   it('tells Mermaid’s theme about dark mode, where it reads it', async () => {
