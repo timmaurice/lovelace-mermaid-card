@@ -10,6 +10,7 @@ vi.mock('../src/mermaid', () => ({
 }));
 
 const { MermaidCard } = await import('../src/mermaid-card');
+const { clampView, zoomAt } = await import('../src/zoom');
 
 // jsdom has no modal dialogs.
 HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
@@ -57,6 +58,18 @@ describe('enlarged view', () => {
     expect(dialog.querySelector('.enlarged svg')).toBeNull();
   });
 
+  it('zooms the dialog with the wheel and opens fitted again', async () => {
+    const card = await mount();
+    card.shadowRoot!.querySelector<HTMLElement>('.enlarge')!.click();
+    const zoom = card.shadowRoot!.querySelector<HTMLElement>('.zoom')!;
+    zoom.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, cancelable: true }));
+    expect(zoom.querySelector('svg')!.style.transform).toMatch(/scale\(1\.2\d*\)/);
+
+    card.shadowRoot!.querySelector('dialog')!.close();
+    card.shadowRoot!.querySelector<HTMLElement>('.enlarge')!.click();
+    expect(zoom.querySelector('svg')!.style.transform).toMatch(/ scale\(1\)$/);
+  });
+
   it('offers no enlarged view for a diagram only a few pixels short of its natural size', async () => {
     const card = await mount();
     const svg = card.shadowRoot!.querySelector('.diagram svg')!;
@@ -70,5 +83,25 @@ describe('enlarged view', () => {
     render.mockResolvedValueOnce({ svg: '<svg><g class="node"></g></svg>' }); // no viewBox, so no maxWidth
     const card = await mount();
     expect(card.shadowRoot!.querySelector('.enlarge')).toBeNull();
+  });
+});
+
+describe('zoom math', () => {
+  it('keeps the point under the pointer where it is', () => {
+    const view = zoomAt({ k: 1, x: 0, y: 0 }, 2, 100, 50, 4);
+    expect(view).toEqual({ k: 2, x: -100, y: -50 });
+    // The content point under (100, 50) was (100, 50) before and is still there after.
+    expect([(100 - view.x) / view.k, (50 - view.y) / view.k]).toEqual([100, 50]);
+  });
+
+  it('stops at the fitted size and at the maximum', () => {
+    expect(zoomAt({ k: 1, x: 0, y: 0 }, 0.5, 10, 10, 4).k).toBe(1);
+    const view = zoomAt({ k: 3, x: -30, y: -30 }, 2, 0, 0, 4);
+    expect(view).toEqual({ k: 4, x: -40, y: -40 }); // only the 4/3 that is left, still around (0, 0)
+  });
+
+  it('keeps the content covering its box', () => {
+    expect(clampView({ k: 2, x: 50, y: -500 }, 300, 200, 4)).toEqual({ k: 2, x: 0, y: -200 });
+    expect(clampView({ k: 0.5, x: -10, y: 10 }, 300, 200, 4)).toEqual({ k: 1, x: 0, y: 0 });
   });
 });

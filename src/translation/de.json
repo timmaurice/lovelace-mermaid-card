@@ -2,7 +2,10 @@
   "card": {
     "enlarge": "Diagramm vergrößern",
     "enlarged": "Vergrößertes Diagramm",
-    "close": "Schließen"
+    "close": "Schließen",
+    "zoom_in": "Vergrößern",
+    "zoom_out": "Verkleinern",
+    "zoom_reset": "An Bildschirm anpassen"
   },
   "editor": {
     "title": "Titel",

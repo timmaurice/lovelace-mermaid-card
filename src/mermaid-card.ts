@@ -6,6 +6,7 @@ import { loadMermaid } from './mermaid';
 import { EDITOR_ELEMENT_NAME } from './editor';
 import { EXAMPLES, diagramType, withHeader } from './header';
 import { localize } from './localize';
+import { attachZoom } from './zoom';
 import cardStyles from './styles/card.styles.scss';
 import { DIRECTIONS, TEMPLATE, type HomeAssistant, type MermaidCardConfig } from './types';
 
@@ -15,6 +16,11 @@ const MDI_ARROW_EXPAND =
   'M10,21V19H6.41L10.91,14.5L9.5,13.09L5,17.59V14H3V21H10M14.5,10.91L19,6.41V10H21V3H14V5H17.59L13.09,9.5L14.5,10.91Z';
 const MDI_CLOSE =
   'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z';
+const MDI_PLUS = 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z';
+const MDI_MINUS = 'M19,13H5V11H19V13Z';
+const MDI_FULLSCREEN_EXIT = 'M14,14H19V16H16V19H14V14M5,14H10V19H8V16H5V14M8,5H10V10H5V8H8V5M19,8V10H14V5H16V8H19Z';
+// Zoom in the enlarged view goes up to this many times the diagram's natural size.
+const MAX_ZOOM = 4;
 // The first `flowchart`/`graph` header line, with its direction if it has one.
 const FLOWCHART_HEADER = /^([ \t]*(?:flowchart|graph)(?:-elk)?)(?:[ \t]+(?:TB|TD|BT|RL|LR))?([ \t]*;?[ \t]*)$/m;
 
@@ -95,6 +101,7 @@ export class MermaidCard extends LitElement {
   @query('.diagram') private _diagram?: HTMLDivElement;
   @query('dialog') private _dialog?: HTMLDialogElement;
   private _svg?: string;
+  private _zoom?: ReturnType<typeof attachZoom>;
 
   private _unsubscribe?: Promise<() => Promise<void>>;
   private _renderToken = 0;
@@ -282,20 +289,33 @@ export class MermaidCard extends LitElement {
 
   private _enlarge(): void {
     this._fillDialog();
+    this._zoom?.reset();
     this._bind();
     this._dialog?.showModal();
   }
 
-  /** The same diagram at its natural width; the dialog scrolls both ways. */
+  /** The same diagram, at most at its natural width and fitted to the screen; zoom shows the rest. */
   private _fillDialog(): void {
-    const content = this._dialog?.querySelector('.enlarged');
-    if (!content || !this._svg) return;
+    const content = this._dialog?.querySelector<HTMLElement>('.zoom');
+    if (!this._dialog || !content || !this._svg) return;
     content.innerHTML = this._svg;
     const svg = content.querySelector('svg');
     const cropped = this._diagram?.querySelector('svg')?.getAttribute('viewBox');
     if (svg && cropped) svg.setAttribute('viewBox', cropped); // the closed dialog has no layout to crop by
     sizeDiagram(svg, this._config?.scale);
-    if (svg) svg.style.minWidth = svg.style.maxWidth;
+    const [, , width, height] =
+      svg
+        ?.getAttribute('viewBox')
+        ?.split(/[\s,]+/)
+        .map(Number) ?? [];
+    const natural = parseFloat(svg?.style.maxWidth ?? '');
+    this._zoom ??= attachZoom(content, this._dialog);
+    if (!svg || !(natural > 0)) return;
+    // The largest dialog the screen allows, less its margin and the padding around the diagram.
+    const fit = Math.min(1, (innerWidth - 64) / natural, ((innerHeight - 96) * width) / (natural * height) || 1);
+    svg.style.width = svg.style.minWidth = svg.style.maxWidth = `${Math.floor(natural * fit)}px`;
+    this._zoom.max = MAX_ZOOM / fit;
+    this._zoom.apply();
   }
 
   private _bind(): void {
@@ -378,17 +398,34 @@ export class MermaidCard extends LitElement {
         }
       </ha-card>
       <dialog
+        tabindex="-1"
         aria-label=${this._config.title ?? localize(this.hass, 'card.enlarged')}
         @click=${(event: Event) => event.target === this._dialog && this._dialog.close()}
-        @close=${() => this._dialog?.querySelector('.enlarged')?.replaceChildren()}
+        @close=${() => this._dialog?.querySelector('.zoom')?.replaceChildren()}
       >
-        <div class="enlarged"></div>
-        <ha-icon-button
-          class="close"
-          .label=${localize(this.hass, 'card.close')}
-          .path=${MDI_CLOSE}
-          @click=${() => this._dialog?.close()}
-        ></ha-icon-button>
+        <div class="enlarged"><div class="zoom"></div></div>
+        <div class="tools">
+          <ha-icon-button
+            .label=${localize(this.hass, 'card.zoom_out')}
+            .path=${MDI_MINUS}
+            @click=${() => this._zoom?.zoom(0.8)}
+          ></ha-icon-button>
+          <ha-icon-button
+            .label=${localize(this.hass, 'card.zoom_in')}
+            .path=${MDI_PLUS}
+            @click=${() => this._zoom?.zoom(1.25)}
+          ></ha-icon-button>
+          <ha-icon-button
+            .label=${localize(this.hass, 'card.zoom_reset')}
+            .path=${MDI_FULLSCREEN_EXIT}
+            @click=${() => this._zoom?.reset()}
+          ></ha-icon-button>
+          <ha-icon-button
+            .label=${localize(this.hass, 'card.close')}
+            .path=${MDI_CLOSE}
+            @click=${() => this._dialog?.close()}
+          ></ha-icon-button>
+        </div>
       </dialog>
     `;
   }

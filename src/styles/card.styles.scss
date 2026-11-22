@@ -30,11 +30,14 @@ ha-card:not([header]) .diagram.shrunk {
   outline: 2px solid var(--primary-color);
 }
 .enlarge,
-.close {
+.tools {
   position: absolute;
   top: 4px;
   inset-inline-end: 4px;
   color: var(--secondary-text-color);
+}
+.tools {
+  display: flex;
 }
 dialog {
   padding: 0; /* .enlarged fills it, so a click that lands on the dialog itself is on the backdrop */
@@ -54,10 +57,15 @@ dialog::backdrop {
   overflow: auto;
   padding: 48px 16px 16px;
 }
-.enlarged svg {
+.zoom {
+  overflow: hidden; /* the zoomed diagram stays inside its fitted box */
+  touch-action: none; /* pinch and drag zoom the diagram, not the page */
+}
+.zoom svg {
   display: block;
   margin: 0 auto;
   height: auto;
+  transform-origin: 0 0;
 }
 /* Mermaid multiplies sankey links onto the background, which a dark card turns black */
 svg[aria-roledescription='sankey'] .link {

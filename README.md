@@ -135,7 +135,7 @@ entities:
     max: 8000 # W at full speed; for a sensor in kW, e.g. max: 8
 ```
 
-A diagram shrinks to fit the card down to three quarters of its natural size; beyond that it scrolls sideways, so the text stays readable. For a narrow card, `direction: TD` usually fits better than a wide `LR` flowchart. When a diagram does not fit, a button in the card's corner opens it at full size in a dialog, where bound nodes still work.
+A diagram shrinks to fit the card down to three quarters of its natural size; beyond that it scrolls sideways, so the text stays readable. For a narrow card, `direction: TD` usually fits better than a wide `LR` flowchart. When a diagram does not fit, a button in the card's corner opens it larger in a dialog, where bound nodes still work. There, pinch or the mouse wheel zooms, dragging pans, and a double tap or double click fits the diagram again.
 
 ### Icons
 
