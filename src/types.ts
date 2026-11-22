@@ -18,8 +18,10 @@ export interface HomeAssistant {
 export interface MermaidCardConfig {
   type: string;
   title?: string;
-  /** Mermaid source; may contain Home Assistant templates. */
+  /** Mermaid source; may contain Home Assistant templates. Its first line may name the type. */
   content: string;
+  /** Mermaid diagram type, used when the content has no header line of its own. Default flowchart. */
+  diagram_type?: string;
   /** Mermaid node id → entity id. Bound nodes are coloured by state and open more-info. */
   entities?: Record<string, string>;
   /** Overrides a flowchart's direction, e.g. TD for a narrow card. */

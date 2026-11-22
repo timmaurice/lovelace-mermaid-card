@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { property, state } from 'lit/decorators.js';
-import { DIAGRAM_TYPES, diagramType, setDiagramType } from './header';
+import { DIAGRAM_TYPES, EXAMPLES, stripHeader, withHeader } from './header';
 import { localize } from './localize';
 import { DiagramNode, listNodes } from './mermaid';
 import type { HomeAssistant, MermaidCardConfig } from './types';
@@ -31,20 +31,42 @@ export class MermaidCardEditor extends LitElement {
     if (JSON.stringify(toMap(this._rows)) !== JSON.stringify(config.entities ?? {})) {
       this._rows = Object.entries(config.entities ?? {}).map(([node, entity]) => ({ node, entity }));
     }
-    this._scheduleNodeList(config.content ?? '');
+    this._scheduleNodeList(this._source(config));
   }
 
   protected updated(changed: Map<string, unknown>): void {
     // Home Assistant may set the config before hass; templates can only be rendered with it.
     if (changed.has('hass') && !changed.get('hass') && this._config) {
       this._nodesFor = undefined;
-      this._scheduleNodeList(this._config.content ?? '');
+      this._scheduleNodeList(this._source(this._config));
     }
   }
 
   public disconnectedCallback(): void {
     super.disconnectedCallback();
     clearTimeout(this._nodesTimer);
+  }
+
+  /** The Mermaid source the card renders for this config. */
+  private _source(config: MermaidCardConfig): string {
+    return withHeader(config.content ?? '', config.diagram_type, config.direction);
+  }
+
+  /**
+   * The config as the form shows it: the type in its own dropdown and the content without a
+   * header line, also for configs written before the option existed or pasted with one.
+   */
+  private _formData(config: MermaidCardConfig) {
+    const { content, type, direction } = stripHeader(config.content ?? '');
+    const finalDirection = config.direction ?? direction;
+    return {
+      ...config,
+      content,
+      diagram_type: type ?? config.diagram_type ?? 'flowchart',
+      // TD is Mermaid's alias for TB; the dropdown offers each direction once.
+      direction: finalDirection === 'TD' ? 'TB' : finalDirection,
+      scale: config.scale ?? 100, // the slider shows the default instead of its minimum
+    };
   }
 
   /** Re-reads the diagram's nodes, debounced: the content changes on every keystroke. */
@@ -90,14 +112,28 @@ export class MermaidCardEditor extends LitElement {
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config }, bubbles: true, composed: true }));
   }
 
-  private _formChanged(event: CustomEvent<{ value: Partial<MermaidCardConfig> & { diagram_type?: string } }>): void {
-    // The type is not an option of its own: it lives in the first line of the content.
-    const { diagram_type: type, ...value } = event.detail.value;
-    const config = { ...this._config, ...value } as MermaidCardConfig;
-    if (type && type !== diagramType(config.content ?? '')) config.content = setDiagramType(config.content ?? '', type);
+  private _formChanged(event: CustomEvent<{ value: Partial<MermaidCardConfig> }>): void {
+    const value = event.detail.value;
+    // A header typed or pasted into the content moves into the dropdowns.
+    const { content, type, direction } = stripHeader(value.content ?? '');
+    const config = {
+      ...this._config,
+      ...value,
+      content,
+      diagram_type: type ?? value.diagram_type ?? 'flowchart',
+      direction: direction ?? value.direction,
+    } as MermaidCardConfig;
+    // A new type brings its example along, as long as nothing of the user's would be lost.
+    const before = this._config ? this._formData(this._config) : undefined;
+    if (before && !type && config.diagram_type !== before.diagram_type) {
+      const untouched = !content.trim() || content === EXAMPLES[before.diagram_type as keyof typeof EXAMPLES];
+      const example = EXAMPLES[config.diagram_type as keyof typeof EXAMPLES];
+      if (untouched && example) config.content = example;
+    }
     if (!config.title) delete config.title;
     // A direction only means something for a flowchart; it would linger unseen otherwise.
-    if (!config.direction || diagramType(config.content ?? '') !== 'flowchart') delete config.direction;
+    if (!config.direction || config.diagram_type !== 'flowchart') delete config.direction;
+    if (config.diagram_type === 'flowchart') delete config.diagram_type; // the default
     if (config.scale === 100) delete config.scale; // the default
     this._emit(config);
   }
@@ -121,19 +157,14 @@ export class MermaidCardEditor extends LitElement {
   protected render() {
     if (!this.hass || !this._config) return nothing;
     const used = new Set(this._rows.map((row) => row.node));
-    const type = diagramType(this._config.content ?? '');
+    const data = this._formData(this._config);
+    const type = data.diagram_type;
     // A type the dropdown does not list (gitGraph, sankey, …) is still shown as it is.
-    const types = [...DIAGRAM_TYPES, ...(type && !(DIAGRAM_TYPES as readonly string[]).includes(type) ? [type] : [])];
+    const types = [...DIAGRAM_TYPES, ...((DIAGRAM_TYPES as readonly string[]).includes(type) ? [] : [type])];
     return html`
       <ha-form
         .hass=${this.hass}
-        .data=${{
-          ...this._config,
-          // TD is Mermaid's alias for TB; the dropdown offers each direction once.
-          direction: this._config.direction === 'TD' ? 'TB' : this._config.direction,
-          scale: this._config.scale ?? 100, // the slider shows the default instead of its minimum
-          diagram_type: type,
-        }}
+        .data=${data}
         .schema=${[
           { name: 'title', selector: { text: {} } },
           {

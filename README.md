@@ -12,23 +12,24 @@ A Home Assistant Lovelace card that renders [Mermaid](https://mermaid.js.org/) d
 
 ## Configuration
 
-The card has a visual editor. The **Diagram type** dropdown reads and rewrites the first line of the diagram, so the source stays plain Mermaid. Under **Bound nodes** you pick a node from a list the editor reads from your diagram, and an entity for it.
+The card has a visual editor. Pick the **Diagram type** from a dropdown; switching it on an empty diagram or an untouched example fills in an example of the new type. Mermaid pasted with its first line (`flowchart LR`, …) is understood: the editor moves the type and direction into their fields. Under **Bound nodes** you pick a node from a list the editor reads from your diagram, and an entity for it.
 
-| Option      | Type   | Required | Description                                                                                                           |
-| ----------- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------- |
-| `content`   | string | yes      | Mermaid source. May contain templates (`{{ states('sensor.x') }}`).                                                   |
-| `title`     | string | no       | Card header.                                                                                                          |
-| `entities`  | map    | no       | Node id → entity id. Works for flowchart, state and class diagrams.                                                   |
-| `direction` | string | no       | Overrides a flowchart's direction: `TB`, `TD`, `BT`, `LR` or `RL`. Handy when the same diagram sits in a narrow card. |
-| `scale`     | number | no       | Size in percent of the diagram's natural size, e.g. `70`. Default `100` fits the diagram to the card.                 |
+| Option         | Type   | Required | Description                                                                                                                                       |
+| -------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `content`      | string | yes      | The diagram. May contain templates (`{{ states('sensor.x') }}`). A first line naming the type (`flowchart LR`, `sequenceDiagram`, …) is optional. |
+| `diagram_type` | string | no       | Mermaid diagram type when `content` has no first line naming one: `flowchart` (default), `sequenceDiagram`, `stateDiagram-v2`, `pie`, …           |
+| `title`        | string | no       | Card header.                                                                                                                                      |
+| `entities`     | map    | no       | Node id → entity id. Works for flowchart, state and class diagrams.                                                                               |
+| `direction`    | string | no       | Overrides a flowchart's direction: `TB`, `TD`, `BT`, `LR` or `RL`. Handy when the same diagram sits in a narrow card.                             |
+| `scale`        | number | no       | Size in percent of the diagram's natural size, e.g. `70`. Default `100` fits the diagram to the card.                                             |
 
 ```yaml
 type: custom:mermaid-card
 title: Heating
+direction: LR
 content: |
-  flowchart LR
-    HP[Heat pump] --> BOIL[("Boiler<br>{{ states('sensor.boiler_temperature') }} °C")]
-    BOIL --> LR["Living room<br>{{ state_attr('climate.living_room', 'current_temperature') }} °C"]
+  HP[Heat pump] --> BOIL[("Boiler<br>{{ states('sensor.boiler_temperature') }} °C")]
+  BOIL --> LR["Living room<br>{{ state_attr('climate.living_room', 'current_temperature') }} °C"]
 entities:
   HP: switch.heat_pump
   LR: climate.living_room

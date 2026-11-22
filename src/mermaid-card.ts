@@ -3,6 +3,7 @@ import { property, query, state } from 'lit/decorators.js';
 import { bindNodes } from './entities';
 import { loadMermaid } from './mermaid';
 import { EDITOR_ELEMENT_NAME } from './editor';
+import { EXAMPLES, withHeader } from './header';
 import { DIRECTIONS, type HomeAssistant, type MermaidCardConfig } from './types';
 
 const ELEMENT_NAME = 'mermaid-card';
@@ -30,6 +31,19 @@ export function sizeDiagram(svg: SVGSVGElement | null, scale = 100): void {
   svg.style.minWidth = `${Math.round(width * MIN_SCALE)}px`;
 }
 
+// Home Assistant's named colours, with its defaults for themes that do not set them. All dark
+// enough to carry white labels.
+const PALETTE: [string, string][] = [
+  ['--blue-color', '#2196f3'],
+  ['--deep-orange-color', '#ff6f22'],
+  ['--green-color', '#4caf50'],
+  ['--purple-color', '#926bc7'],
+  ['--red-color', '#f44336'],
+  ['--teal-color', '#009688'],
+  ['--pink-color', '#e91e63'],
+  ['--indigo-color', '#3f51b5'],
+];
+
 type TemplateMessage = { result: string } | { error: string; level?: string };
 
 export class MermaidCard extends LitElement {
@@ -48,7 +62,7 @@ export class MermaidCard extends LitElement {
   }
 
   public static getStubConfig(): Partial<MermaidCardConfig> {
-    return { content: 'flowchart LR\n  A[Home Assistant] --> B[Mermaid]' };
+    return { content: EXAMPLES.flowchart };
   }
 
   public setConfig(config: MermaidCardConfig): void {
@@ -60,6 +74,9 @@ export class MermaidCard extends LitElement {
     }
     if (config.direction !== undefined && !DIRECTIONS.includes(config.direction)) {
       throw new Error(`direction must be one of ${DIRECTIONS.join(', ')}`);
+    }
+    if (config.diagram_type !== undefined && typeof config.diagram_type !== 'string') {
+      throw new Error('diagram_type must be a Mermaid diagram type, e.g. flowchart');
     }
     if (config.scale !== undefined && !(typeof config.scale === 'number' && config.scale > 0)) {
       throw new Error('scale must be a positive number, in percent');
@@ -133,10 +150,17 @@ export class MermaidCard extends LitElement {
         theme: 'base',
         darkMode: Boolean(this.hass?.themes?.darkMode),
         themeVariables: this._themeVariables(),
+        // Gantt charts draw at a fixed width with small text; this one fills the card instead.
+        gantt: {
+          useWidth: Math.max((this._diagram?.clientWidth ?? 0) - 32, 320),
+          fontSize: 14,
+          sectionFontSize: 14,
+          barHeight: 24,
+        },
       });
       const { svg, bindFunctions } = await mermaid.render(
         `${ELEMENT_NAME}-${++renderCount}`,
-        applyDirection(text, this._config?.direction),
+        applyDirection(withHeader(text, this._config?.diagram_type, this._config?.direction), this._config?.direction),
       );
       if (token !== this._renderToken) return; // a newer render overtook this one
       await this.updateComplete;
@@ -181,7 +205,20 @@ export class MermaidCard extends LitElement {
       noteTextColor: read('--primary-text-color'),
       noteBorderColor: read('--divider-color'),
       fontFamily: style.fontFamily,
+      pieStrokeColor: read('--card-background-color'),
+      pieOuterStrokeColor: read('--divider-color'),
+      pieSectionTextColor: '#ffffff',
+      pieTitleTextColor: read('--primary-text-color'),
+      pieLegendTextColor: read('--primary-text-color'),
     };
+    // Pie slices, mind map branches and timeline sections each take a colour of their own. Mermaid
+    // derives them from primaryColor, which a card background makes near black; HA's palette instead.
+    PALETTE.forEach(([name, fallback], index) => {
+      const color = read(name) || fallback;
+      vars[`pie${index + 1}`] = color;
+      vars[`cScale${index}`] = color;
+      vars[`cScaleLabel${index}`] = '#ffffff';
+    });
     return Object.fromEntries(Object.entries(vars).filter(([, value]) => value));
   }
 

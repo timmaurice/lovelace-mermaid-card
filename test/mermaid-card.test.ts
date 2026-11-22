@@ -80,6 +80,15 @@ describe('MermaidCard', () => {
     card.remove();
   });
 
+  it('adds the header from the options when the content has none', async () => {
+    const card = new MermaidCard();
+    card.setConfig({ type: 'custom:mermaid-card', content: '  A --> B', direction: 'TB' });
+    card.hass = makeHass({});
+    document.body.append(card);
+    await vi.waitFor(() => expect(render).toHaveBeenLastCalledWith(expect.any(String), 'flowchart TB\n  A --> B'));
+    card.remove();
+  });
+
   it('renders templated content through render_template and unsubscribes on removal', async () => {
     const unsubscribe = vi.fn(async () => undefined);
     let push: (message: unknown) => void = () => undefined;
@@ -183,22 +192,55 @@ describe('MermaidCardEditor', () => {
     expect(emitted.at(-1)!.entities).toBeUndefined();
   });
 
-  it('rewrites the header when the diagram type changes, without storing the type', () => {
+  it('moves a header from the content into the options, and drops defaults', () => {
     const editor = new MermaidCardEditor();
     const emitted: Record<string, unknown>[] = [];
     editor.addEventListener('config-changed', (event) => emitted.push((event as CustomEvent).detail.config));
-    editor.setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR\n  A --> B', direction: 'TD', scale: 100 });
-    (editor as unknown as { _formChanged(event: CustomEvent): void })._formChanged(
-      new CustomEvent('value-changed', {
-        detail: {
-          value: { content: 'flowchart LR\n  A --> B', direction: 'TB', scale: 100, diagram_type: 'stateDiagram-v2' },
-        },
-      }),
-    );
+    editor.setConfig({ type: 'custom:mermaid-card', content: 'A --> B' });
+    const change = (value: Record<string, unknown>) =>
+      (editor as unknown as { _formChanged(event: CustomEvent): void })._formChanged(
+        new CustomEvent('value-changed', { detail: { value: { content: 'A --> B', scale: 100, ...value } } }),
+      );
+
+    change({ content: 'stateDiagram-v2\n  A --> B', diagram_type: 'flowchart' }); // pasted with a header
     expect(emitted.at(-1)).toEqual({
       type: 'custom:mermaid-card',
-      content: 'stateDiagram-v2\n  A --> B',
+      content: '  A --> B',
+      diagram_type: 'stateDiagram-v2',
     });
+
+    change({ content: 'flowchart LR\n  A --> B', diagram_type: 'pie' });
+    expect(emitted.at(-1)).toEqual({ type: 'custom:mermaid-card', content: '  A --> B', direction: 'LR' });
+
+    change({ diagram_type: 'sequenceDiagram', direction: 'LR' }); // a direction means nothing there
+    expect(emitted.at(-1)).toEqual({
+      type: 'custom:mermaid-card',
+      content: 'A --> B',
+      diagram_type: 'sequenceDiagram',
+    });
+  });
+
+  it('swaps in the example of a new type, but never over the user’s own content', async () => {
+    const { EXAMPLES } = await import('../src/header');
+    const editor = new MermaidCardEditor();
+    const emitted: { content?: string }[] = [];
+    editor.addEventListener('config-changed', (event) => emitted.push((event as CustomEvent).detail.config));
+    const change = (value: Record<string, unknown>) =>
+      (editor as unknown as { _formChanged(event: CustomEvent): void })._formChanged(
+        new CustomEvent('value-changed', { detail: { value: { scale: 100, ...value } } }),
+      );
+
+    editor.setConfig({ type: 'custom:mermaid-card', content: EXAMPLES.flowchart });
+    change({ content: EXAMPLES.flowchart, diagram_type: 'pie' });
+    expect(emitted.at(-1)!.content).toBe(EXAMPLES.pie);
+
+    editor.setConfig({ type: 'custom:mermaid-card', content: '', diagram_type: 'pie' });
+    change({ content: '', diagram_type: 'gantt' });
+    expect(emitted.at(-1)!.content).toBe(EXAMPLES.gantt);
+
+    editor.setConfig({ type: 'custom:mermaid-card', content: '  A --> B' });
+    change({ content: '  A --> B', diagram_type: 'pie' });
+    expect(emitted.at(-1)!.content).toBe('  A --> B');
   });
 
   it('offers the diagram nodes once the content was parsed', async () => {
@@ -224,19 +266,35 @@ describe('localize', () => {
 });
 
 describe('diagram header', async () => {
-  const { diagramType, setDiagramType } = await import('../src/header');
+  const { diagramType, stripHeader, withHeader } = await import('../src/header');
 
-  it('reads the type behind front matter, comments and aliases', () => {
+  it('reads a header behind front matter and comments, and nothing else', () => {
     expect(diagramType('flowchart LR\n  A --> B')).toBe('flowchart');
     expect(diagramType('graph TD;\n  A --> B')).toBe('flowchart');
     expect(diagramType('---\ntitle: x\n---\n%% note\nstateDiagram\n  [*] --> A')).toBe('stateDiagram-v2');
+    expect(diagramType('A --> B')).toBeUndefined(); // a node line, not a header
     expect(diagramType('')).toBeUndefined();
   });
 
-  it('rewrites only the header line', () => {
-    expect(setDiagramType('flowchart LR\n  A --> B', 'sequenceDiagram')).toBe('sequenceDiagram\n  A --> B');
-    expect(setDiagramType('graph LR\n  A --> B', 'flowchart')).toBe('graph LR\n  A --> B');
-    expect(setDiagramType('---\ntitle: x\n---\npie\n  "a": 1', 'gantt')).toBe('---\ntitle: x\n---\ngantt\n  "a": 1');
-    expect(setDiagramType('', 'flowchart')).toBe('flowchart\n');
+  it('takes the header out, keeping front matter', () => {
+    expect(stripHeader('flowchart LR\n  A --> B')).toEqual({
+      content: '  A --> B',
+      type: 'flowchart',
+      direction: 'LR',
+    });
+    expect(stripHeader('---\ntitle: x\n---\npie\n  "a": 1')).toEqual({
+      content: '---\ntitle: x\n---\n  "a": 1',
+      type: 'pie',
+      direction: undefined,
+    });
+    expect(stripHeader('A --> B')).toEqual({ content: 'A --> B', type: undefined, direction: undefined });
+  });
+
+  it('builds the header from the options unless the content has its own', () => {
+    expect(withHeader('  A --> B')).toBe('flowchart\n  A --> B');
+    expect(withHeader('  A --> B', 'flowchart', 'TB')).toBe('flowchart TB\n  A --> B');
+    expect(withHeader('  A->>B: hi', 'sequenceDiagram', 'TB')).toBe('sequenceDiagram\n  A->>B: hi');
+    expect(withHeader('---\ntitle: x\n---\n  "a": 1', 'pie')).toBe('---\ntitle: x\n---\npie\n  "a": 1');
+    expect(withHeader('graph LR\n  A --> B', 'pie')).toBe('graph LR\n  A --> B');
   });
 });
