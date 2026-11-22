@@ -187,6 +187,27 @@ export class MermaidCardEditor extends LitElement {
     return { ...row, entity: suggestEntity(row.node, text, this.hass.states) };
   }
 
+  /** Appends a node showing the entity's name and state, and binds it, in one config change. */
+  private _addNode(entityId: string | undefined): void {
+    if (!entityId || !this._config) return;
+    // A lowercase `end` closes a subgraph in Mermaid, so it cannot be a node id.
+    const taken = new Set(['end', ...this._nodes.map((node) => node.id), ...this._rows.map((row) => row.node)]);
+    const base = entityId.split('.')[1]?.replace(/\W/g, '') || 'node';
+    let id = base;
+    for (let n = 2; taken.has(id); n++) id = `${base}_${n}`;
+    const name = (this.hass?.states[entityId]?.attributes.friendly_name || entityId)
+      .replace(/"/g, '#quot;')
+      .replace(/\{/g, '#123;'); // `{{` or `{%` in a name would be read as a template
+    const line = `  ${id}["${name}<br>{{ states('${entityId}', with_unit=True) }}"]`;
+    const content = this._config.content ?? '';
+    this._rows = [...this._rows, { node: id, entity: entityId }];
+    this._emit({
+      ...this._config,
+      content: content && !content.endsWith('\n') ? `${content}\n${line}` : `${content}${line}`,
+      entities: toMap(this._rows),
+    });
+  }
+
   private _label = (schema: { name: string }) => localize(this.hass, `editor.${schema.name}`);
   // The entity picker draws its label above the field, which pushes it below the node field
   // beside it; it is self-explanatory with its own placeholder.
@@ -315,6 +336,18 @@ export class MermaidCardEditor extends LitElement {
         <ha-button @click=${() => this._rowsChanged([...this._rows, { node: '', entity: '' }])}>
           ${localize(this.hass, 'editor.add_binding')}
         </ha-button>
+        ${
+          type === 'flowchart'
+            ? html`<ha-form
+                .hass=${this.hass}
+                .data=${{}}
+                .schema=${[{ name: 'add_node', selector: { entity: {} } }]}
+                .computeLabel=${this._label}
+                @value-changed=${(event: CustomEvent<{ value: { add_node?: string } }>) =>
+                  this._addNode(event.detail.value.add_node)}
+              ></ha-form>`
+            : nothing
+        }
       </div>
     `;
   }

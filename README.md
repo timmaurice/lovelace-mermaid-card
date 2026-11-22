@@ -13,7 +13,7 @@ A Home Assistant Lovelace card that renders [Mermaid](https://mermaid.js.org/) d
 
 ## Configuration
 
-The card has a visual editor. Pick the **Diagram type** from a dropdown; switching it on an empty diagram or an untouched example fills in an example of the new type. Mermaid pasted with its first line (`flowchart LR`, …) is understood: the editor moves the type and direction into their fields. Under **Bound nodes** you pick a node from a list the editor reads from your diagram, and an entity for it. When exactly one entity's friendly name matches the node's text, or its object id the node id, it is filled in for you.
+The card has a visual editor. Pick the **Diagram type** from a dropdown; switching it on an empty diagram or an untouched example fills in an example of the new type. Mermaid pasted with its first line (`flowchart LR`, …) is understood: the editor moves the type and direction into their fields. Under **Bound nodes** you pick a node from a list the editor reads from your diagram, and an entity for it. When exactly one entity's friendly name matches the node's text, or its object id the node id, it is filled in for you. In a flowchart, **Add an entity as a node** appends a node with the entity's name and state and binds it in one step.
 
 | Option         | Type   | Required | Description                                                                                                                                       |
 | -------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |

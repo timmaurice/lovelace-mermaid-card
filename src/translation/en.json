@@ -17,6 +17,7 @@
     "node": "Node",
     "entity": "Entity",
     "add_binding": "Bind a node",
+    "add_node": "Add an entity as a node",
     "remove_binding": "Remove",
     "actions": "Actions",
     "tap_action": "Tap action",
