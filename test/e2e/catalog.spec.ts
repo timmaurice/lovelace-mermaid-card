@@ -7,7 +7,8 @@ import { setState, useDashboard } from './helpers/homeassistant';
 
 // The README's catalog: one card per diagram type, each on live demo states with what the card
 // adds where the type allows it (templates, bindings, moving edges, icons). Every run checks
-// that they all render; `npm run catalog` also writes the screenshots to docs/catalog.
+// that they all render; `npm run catalog` also writes the screenshots to docs/catalog
+// (needs ImageMagick and cwebp).
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../../docs/catalog');
 
 const STATES: [string, string, Record<string, unknown>][] = [
@@ -336,7 +337,20 @@ test('every catalog diagram renders', async ({ page, consoleErrors }) => {
       const name = scheme === 'dark' ? `${file}-dark` : file;
       const png = resolve(OUT, `${name}.png`);
       await cards.nth(index).locator('ha-card').screenshot({ path: png, animations: 'disabled' });
-      execFileSync('cwebp', ['-quiet', '-q', '85', png, '-o', resolve(OUT, `${name}.webp`)]);
+      // One size for every tile, so the README's captions line up: the card fitted in, the rest transparent.
+      execFileSync('magick', [
+        png,
+        '-resize',
+        '820x520>',
+        '-background',
+        'none',
+        '-gravity',
+        'center',
+        '-extent',
+        '820x520',
+        png,
+      ]);
+      execFileSync('cwebp', ['-quiet', '-q', '85', '-exact', png, '-o', resolve(OUT, `${name}.webp`)]);
       rmSync(png);
     }
   }
