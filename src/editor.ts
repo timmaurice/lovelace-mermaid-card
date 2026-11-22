@@ -14,15 +14,20 @@ interface Binding extends NodeBinding {
   node: string;
 }
 
-/** The config's entities: a plain entity id per node, the long form only where there are actions. */
+/** The config's entities: a plain entity id per node, the long form only where there is more. */
 const toMap = (rows: Binding[]): Record<string, string | NodeBinding> =>
   Object.fromEntries(
     rows
       .filter((row) => row.node && row.entity)
-      .map(({ node, entity, tap_action, hold_action }) => [
+      .map(({ node, entity, active_when, tap_action, hold_action }) => [
         node,
-        tap_action || hold_action
-          ? { entity, ...(tap_action && { tap_action }), ...(hold_action && { hold_action }) }
+        active_when?.length || tap_action || hold_action
+          ? {
+              entity,
+              ...(active_when?.length && { active_when }),
+              ...(tap_action && { tap_action }),
+              ...(hold_action && { hold_action }),
+            }
           : entity,
       ]),
   );
@@ -368,6 +373,17 @@ export class MermaidCardEditor extends LitElement {
                       { name: 'entity', selector: { entity: {} } },
                     ],
                   },
+                  {
+                    name: 'active_when',
+                    selector: {
+                      select: {
+                        multiple: true,
+                        custom_value: true,
+                        // The states an input_select or select can take; anything else is typed in.
+                        options: Array.isArray(stateObj?.attributes.options) ? stateObj.attributes.options : [],
+                      },
+                    },
+                  },
                   // Edges are not tappable, so actions on them would do nothing.
                   ...(edges.has(row.node)
                     ? []
@@ -377,6 +393,7 @@ export class MermaidCardEditor extends LitElement {
                       ]),
                 ]}
                 .computeLabel=${this._rowLabel}
+                .computeHelper=${this._helper}
                 @value-changed=${(event: CustomEvent<{ value: Binding }>) =>
                   this._rowsChanged(
                     this._rows.map((old, i) =>

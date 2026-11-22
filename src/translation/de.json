@@ -21,6 +21,8 @@
     "new_binding": "Neue Bindung",
     "add_node": "Entität als Knoten hinzufügen",
     "remove_binding": "Entfernen",
+    "active_when": "Aktiv bei",
+    "active_when_helper": "Nur in diesen Zuständen hervorheben, z. B. ein Knoten je Zustand derselben Entität. Leer: jeder aktive Zustand.",
     "tap_action": "Aktion beim Tippen",
     "hold_action": "Aktion beim Gedrückthalten",
     "stale_binding": "Dieser Knoten ist nicht im Diagramm.",

@@ -70,7 +70,7 @@ The card has a visual editor. Pick the **Diagram type** from a dropdown; switchi
 | `content`      | string | yes      | The diagram. May contain templates (`{{ states('sensor.x') }}`). A first line naming the type (`flowchart LR`, `sequenceDiagram`, …) is optional. |
 | `diagram_type` | string | no       | Mermaid diagram type when `content` has no first line naming one: `flowchart` (default), `sequenceDiagram`, `stateDiagram-v2`, `pie`, …           |
 | `title`        | string | no       | Card header.                                                                                                                                      |
-| `entities`     | map    | no       | Node or edge id → entity id, or a mapping with `entity`, `tap_action`, `hold_action`. Works for flowchart, state and class diagrams.              |
+| `entities`     | map    | no       | Node or edge id → entity id, or a mapping with `entity`, `active_when`, `tap_action`, `hold_action`. For flowcharts, state, class diagrams.       |
 | `direction`    | string | no       | A flowchart's direction: `TB` (top to bottom, the default), `BT`, `LR` or `RL`. Overrides a direction in the content's first line.                |
 | `scale`        | number | no       | Size in percent of the diagram's natural size, e.g. `70`. Default `100` fits the diagram to the card.                                             |
 
@@ -104,6 +104,26 @@ entities:
       action: toggle
   flow: sensor.heat_pump_power
 ```
+
+Several nodes can share one entity with `active_when`: a node then counts as active only while the entity has that state, or one of a list of states, and shows the inactive colour otherwise. A robot vacuum's state diagram lights up the state it is in:
+
+```yaml
+type: custom:mermaid-card
+diagram_type: stateDiagram-v2
+content: |
+  [*] --> Docked
+  Docked --> Cleaning
+  Cleaning --> Docked
+entities:
+  Docked:
+    entity: input_select.robot_vacuum
+    active_when: [Docked, Charging]
+  Cleaning:
+    entity: input_select.robot_vacuum
+    active_when: Cleaning
+```
+
+On a bound edge, `active_when` decides when it moves. Numbers go in quotes (`active_when: "3"`).
 
 A diagram shrinks to fit the card down to three quarters of its natural size; beyond that it scrolls sideways, so the text stays readable. For a narrow card, `direction: TD` usually fits better than a wide `LR` flowchart. When a diagram does not fit, a button in the card's corner opens it at full size in a dialog, where bound nodes still work.
 

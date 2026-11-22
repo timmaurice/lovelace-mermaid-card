@@ -21,6 +21,8 @@
     "new_binding": "New binding",
     "add_node": "Add an entity as a node",
     "remove_binding": "Remove",
+    "active_when": "Active when",
+    "active_when_helper": "Light up only in these states, e.g. one node per state of the same entity. Empty: any active state.",
     "tap_action": "Tap action",
     "hold_action": "Hold action",
     "stale_binding": "This node is not in the diagram.",

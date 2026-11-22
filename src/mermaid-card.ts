@@ -119,6 +119,10 @@ export class MermaidCard extends LitElement {
       if (typeof toBinding(value)?.entity !== 'string') {
         throw new Error('each entry of entities must be an entity id, or a mapping with an entity');
       }
+      const activeWhen = toBinding(value).active_when;
+      if (activeWhen !== undefined && ![activeWhen].flat().every((state) => typeof state === 'string')) {
+        throw new Error('active_when must be a state or a list of states, numbers in quotes');
+      }
     }
     if (config.direction !== undefined && !DIRECTIONS.includes(config.direction)) {
       throw new Error(`direction must be one of ${DIRECTIONS.join(', ')}`);

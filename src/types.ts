@@ -29,6 +29,8 @@ export type ActionConfig = { action: string; [key: string]: unknown };
 /** A node bound to an entity, with the actions a tap or a long press runs. */
 export interface NodeBinding {
   entity: string;
+  /** The state, or states, in which the node counts as active; any active state without it. */
+  active_when?: string | string[];
   tap_action?: ActionConfig;
   hold_action?: ActionConfig;
 }

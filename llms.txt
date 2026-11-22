@@ -39,11 +39,23 @@ entities:                 # optional; node or edge id -> entity
 
 - **Nodes** of flowcharts, state diagrams and class diagrams. The key is the node id (`HP` in `HP[Heat pump]`, the state name in a state diagram, the class name).
 - **Edges** of flowcharts. Name an edge with Mermaid's `@` syntax, `A e1@--> B`, and bind `e1`. Unnamed edges have ids like `L_A_B_0` (`L_<from>_<to>_<n>`).
-- A value is an entity id, or a mapping with `entity`, `tap_action`, `hold_action` (Home Assistant's [action format](https://www.home-assistant.io/dashboards/actions/): `more-info`, `toggle`, `navigate`, `perform-action`, `url`, `none`).
+- A value is an entity id, or a mapping with `entity`, `active_when`, `tap_action`, `hold_action` (Home Assistant's [action format](https://www.home-assistant.io/dashboards/actions/): `more-info`, `toggle`, `navigate`, `perform-action`, `url`, `none`).
 - Node colour follows the entity's state: active (`on`, `open`, `heat`, `home`, any other text) gets the domain's active colour, inactive (`off`, `closed`, `idle`, `standby`, `not_home`, `locked`, `paused`, `docked`, `disarmed`) the inactive colour, `unavailable`/`unknown` the unavailable colour. Numeric states leave the node uncoloured: put values in the label instead.
 - Tap opens more-info unless `tap_action` says otherwise; a long press runs `hold_action` only when it is set. Edges take no actions. The *Controls* example below runs one of each action.
 - A bound edge moves while its entity is active: on, open, heating, or a number other than zero. It takes the entity's colour, arrowhead included. How it moves comes from the diagram: `e1@{ animation: slow }` (or `fast`), or a `classDef` with its own `animation` applied with `class e1 …`; with none, it moves fast. "Reduce motion" stops all of it.
-- The binding colours every node bound to an entity. To mark one state of many (the current robot state, the branch taken), use a template that writes `class <id> <classDef>` instead.
+- `active_when: <state>` (or a list of states) makes only those states count as active, compared with the state as text. Several nodes can then share one entity and only the matching one lights up: active colour on a match, inactive colour otherwise, unavailable colour only when the entity is `unavailable`/`unknown`. On an edge it decides whether the edge moves. Quote numbers (`active_when: "3"`).
+
+```yaml
+type: custom:mermaid-card
+diagram_type: stateDiagram-v2
+content: |
+  [*] --> Docked
+  Docked --> Cleaning
+  Cleaning --> Docked
+entities:
+  Docked: { entity: input_select.robot_vacuum, active_when: [Docked, Charging] }
+  Cleaning: { entity: input_select.robot_vacuum, active_when: Cleaning }
+```
 
 ## Template patterns
 

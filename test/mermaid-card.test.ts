@@ -44,6 +44,21 @@ describe('stateColor', () => {
     expect(isActive(entity('light.a', 'unavailable'))).toBe(false);
     expect(isActive(undefined)).toBe(false);
   });
+
+  it('with active_when, counts only the given states as active, and unavailable as unavailable', () => {
+    const vacuum = (state: string) => entity('input_select.robot_vacuum', state);
+    const active = '--state-input_select-active-color';
+    const inactive = '--state-input_select-inactive-color';
+    expect(stateColor(vacuum('Cleaning'), 'Cleaning')).toContain(active);
+    expect(stateColor(vacuum('Docked'), 'Cleaning')).toContain(inactive);
+    expect(stateColor(vacuum('Docked'), ['Cleaning', 'Docked'])).toContain(active);
+    expect(stateColor(vacuum('unavailable'), 'Cleaning')).toContain('--state-unavailable-color');
+    expect(stateColor(entity('sensor.phase', '3'), '3')).toContain('--state-sensor-active-color');
+    expect(isActive(vacuum('Cleaning'), ['Cleaning'])).toBe(true);
+    expect(isActive(vacuum('Docked'), 'Cleaning')).toBe(false);
+    expect(isActive(entity('switch.a', 'off'), 'off')).toBe(true);
+    expect(isActive(vacuum('unknown'), 'unknown')).toBe(false);
+  });
 });
 
 describe('bindNodes', () => {
@@ -62,6 +77,29 @@ describe('bindNodes', () => {
     a.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     expect(onTap).toHaveBeenCalledTimes(2);
     expect(onTap).toHaveBeenCalledWith({ entity: 'light.a' }, 'tap');
+  });
+
+  it('lights only the node whose active_when matches, when several share one entity', () => {
+    const root = document.createElement('div');
+    root.innerHTML =
+      '<svg><g class="node" id="mermaid-card-1-state-Cleaning-0"><rect></rect></g>' +
+      '<g class="node" id="mermaid-card-1-state-Docked-0"><rect></rect></g>' +
+      '<path data-id="e1"></path></svg>';
+    const vacuum = 'input_select.robot_vacuum';
+    bindNodes(
+      root,
+      {
+        Cleaning: { entity: vacuum, active_when: 'Cleaning' },
+        Docked: { entity: vacuum, active_when: ['Docked', 'Charging'] },
+        e1: { entity: vacuum, active_when: 'Cleaning' },
+      },
+      { [vacuum]: entity(vacuum, 'Charging') },
+      vi.fn(),
+    );
+    const [cleaning, docked] = root.querySelectorAll('rect');
+    expect(cleaning.style.getPropertyValue('stroke')).toContain('--state-input_select-inactive-color');
+    expect(docked.style.getPropertyValue('stroke')).toContain('--state-input_select-active-color');
+    expect(root.querySelector('path')!.classList.contains('edge-animation-fast')).toBe(false);
   });
 
   it('runs the hold action on a long press instead of the tap', () => {
@@ -134,6 +172,19 @@ describe('MermaidCard', () => {
 
   it('rejects a config without content', () => {
     expect(() => new MermaidCard().setConfig({ type: 'custom:mermaid-card' } as never)).toThrow(/content/);
+  });
+
+  it('accepts active_when as a state or a list of states, nothing else', () => {
+    const config = (active_when: unknown) =>
+      ({
+        type: 'custom:mermaid-card',
+        content: 'A',
+        entities: { A: { entity: 'input_select.v', active_when } },
+      }) as never;
+    expect(() => new MermaidCard().setConfig(config('Cleaning'))).not.toThrow();
+    expect(() => new MermaidCard().setConfig(config(['Cleaning', 'Docked']))).not.toThrow();
+    expect(() => new MermaidCard().setConfig(config(3))).toThrow(/active_when/);
+    expect(() => new MermaidCard().setConfig(config(['Cleaning', { state: 'x' }]))).toThrow(/active_when/);
   });
 
   it('renders plain content without a template subscription and binds nodes', async () => {
@@ -330,7 +381,7 @@ describe('sizeDiagram', () => {
 });
 
 describe('MermaidCardEditor', () => {
-  type Rows = { node: string; entity: string }[];
+  type Rows = { node: string; entity: string; active_when?: string | string[] }[];
   const internals = (editor: InstanceType<typeof MermaidCardEditor>) =>
     editor as unknown as { _rows: Rows; _nodes: unknown[]; _rowsChanged(rows: Rows): void };
 
@@ -371,7 +422,10 @@ describe('MermaidCardEditor', () => {
     const schemas = [...editor.shadowRoot!.querySelectorAll('ha-expansion-panel ha-form')].map((form) =>
       (form as unknown as { schema: { name: string }[] }).schema.map((item) => item.name),
     );
-    expect(schemas).toEqual([['', 'tap_action', 'hold_action'], ['']]);
+    expect(schemas).toEqual([
+      ['', 'active_when', 'tap_action', 'hold_action'],
+      ['', 'active_when'],
+    ]);
     editor.remove();
   });
 
@@ -404,6 +458,24 @@ describe('MermaidCardEditor', () => {
     editor.setConfig({ type: 'custom:mermaid-card', content: 'A --> B', entities });
     internals(editor)._rowsChanged(internals(editor)._rows);
     expect(emitted.at(-1)!.entities).toEqual(entities);
+  });
+
+  it('keeps active_when, as a state or a list, and drops it when emptied', () => {
+    const editor = new MermaidCardEditor();
+    const emitted: { entities?: Record<string, unknown> }[] = [];
+    editor.addEventListener('config-changed', (event) => emitted.push((event as CustomEvent).detail.config));
+    const entities = {
+      A: { entity: 'input_select.v', active_when: 'Cleaning' },
+      B: { entity: 'input_select.v', active_when: ['Docked', 'Charging'] },
+    };
+    editor.setConfig({ type: 'custom:mermaid-card', content: 'A --> B', entities });
+    internals(editor)._rowsChanged(internals(editor)._rows);
+    expect(emitted.at(-1)!.entities).toEqual(entities);
+    internals(editor)._rowsChanged([
+      { node: 'A', entity: 'input_select.v', active_when: [] },
+      { node: 'B', entity: 'input_select.v', active_when: '' },
+    ]);
+    expect(emitted.at(-1)!.entities).toEqual({ A: 'input_select.v', B: 'input_select.v' });
   });
 
   it('moves a header from the content into the options, and drops defaults', () => {

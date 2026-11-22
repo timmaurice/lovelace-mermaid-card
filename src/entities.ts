@@ -4,19 +4,31 @@ import type { HassEntity, NodeBinding } from './types';
 const INACTIVE = new Set(['off', 'closed', 'idle', 'standby', 'not_home', 'locked', 'paused', 'docked', 'disarmed']);
 const UNAVAILABLE = new Set(['unavailable', 'unknown']);
 
-/** The fill a bound node gets for its entity's state, or undefined to keep the diagram's own. */
-export function stateColor(entity: HassEntity | undefined): string | undefined {
+/** Whether the entity's state is one of a binding's `active_when` states. */
+const matches = (entity: HassEntity, activeWhen: string | string[]) => [activeWhen].flat().includes(entity.state);
+
+/**
+ * The fill a bound node gets for its entity's state, or undefined to keep the diagram's own.
+ * With `activeWhen`, only those states count as active, numbers included.
+ */
+export function stateColor(entity: HassEntity | undefined, activeWhen?: string | string[]): string | undefined {
   if (!entity || UNAVAILABLE.has(entity.state)) return 'var(--state-unavailable-color, var(--disabled-color))';
-  if (entity.state !== '' && !Number.isNaN(Number(entity.state))) return undefined; // values belong in the label
+  const numeric = entity.state !== '' && !Number.isNaN(Number(entity.state));
+  if (numeric && !activeWhen?.length) return undefined; // values belong in the label
   const domain = entity.entity_id.split('.')[0];
-  return INACTIVE.has(entity.state)
+  return (!activeWhen?.length ? INACTIVE.has(entity.state) : !matches(entity, activeWhen))
     ? `var(--state-${domain}-inactive-color, var(--state-inactive-color))`
     : `var(--state-${domain}-active-color, var(--state-active-color, var(--amber-color)))`;
 }
 
-/** Whether an entity counts as running: on, open, heating, or a number other than zero. */
-export function isActive(entity: HassEntity | undefined): boolean {
-  if (!entity?.state || UNAVAILABLE.has(entity.state) || INACTIVE.has(entity.state)) return false;
+/**
+ * Whether an entity counts as running: on, open, heating, or a number other than zero; with
+ * `activeWhen`, only in one of those states.
+ */
+export function isActive(entity: HassEntity | undefined, activeWhen?: string | string[]): boolean {
+  if (!entity?.state || UNAVAILABLE.has(entity.state)) return false;
+  if (activeWhen?.length) return matches(entity, activeWhen);
+  if (INACTIVE.has(entity.state)) return false;
   return Number(entity.state) !== 0; // NaN for text states, which count as active
 }
 
@@ -77,7 +89,9 @@ export function bindNodes(
     const binding = toBinding(value);
     const entity = states[binding.entity];
     for (const edge of edges.filter((candidate) => candidate.dataset.id === nodeId)) {
-      const color = isActive(entity) ? (stateColor(entity) ?? 'var(--state-active-color)') : undefined;
+      const color = isActive(entity, binding.active_when)
+        ? (stateColor(entity, binding.active_when) ?? 'var(--state-active-color)')
+        : undefined;
       // The entity only turns the animation on and off; how it moves is the diagram's choice:
       // `animation: slow`, a classDef's own animation (inline on the path), or else fast.
       const own = (edge.dataset.ownAnimation ??= edge.classList.contains('edge-animation-slow')
@@ -99,7 +113,7 @@ export function bindNodes(
       `(?:^|-)(?:flowchart|state|classId)-${nodeId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`,
     );
     for (const node of nodes.filter((candidate) => pattern.test(candidate.id))) {
-      const color = stateColor(entity);
+      const color = stateColor(entity, binding.active_when);
       for (const shape of node.querySelectorAll<SVGElement>(
         ':scope > rect, :scope > polygon, :scope > circle, :scope > ellipse, :scope > path, :scope > g > path, :scope > g > rect',
       )) {
