@@ -24,6 +24,8 @@ export interface MermaidApi {
 export interface DiagramNode {
   id: string;
   label: string;
+  /** The text the node shows, without its id. */
+  text: string;
 }
 
 /**
@@ -44,12 +46,12 @@ export async function listNodes(text: string): Promise<DiagramNode[]> {
       ...[...nodes]
         .filter(([id]) => !id.startsWith('root_')) // a state diagram's [*] start and end
         .map(([id, node]) => {
-          const label = String(node.text ?? node.label ?? '').replace(/<br\s*\/?>/gi, ' ');
-          return { id, label: label && label !== id ? `${id} – ${label}` : id };
+          const text = String(node.text ?? node.label ?? '').replace(/<br\s*\/?>/gi, ' ');
+          return { id, label: text && text !== id ? `${id} – ${text}` : id, text };
         }),
       ...edges
         .filter((edge) => edge.id)
-        .map((edge) => ({ id: edge.id!, label: `${edge.id} – ${edge.start} → ${edge.end}` })),
+        .map((edge) => ({ id: edge.id!, label: `${edge.id} – ${edge.start} → ${edge.end}`, text: '' })),
     ];
   } catch {
     return [];

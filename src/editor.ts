@@ -4,7 +4,7 @@ import { DIAGRAM_TYPES, EXAMPLES, stripHeader, withHeader } from './header';
 import { localize } from './localize';
 import { DiagramNode, listNodes } from './mermaid';
 import { toBinding } from './entities';
-import type { HomeAssistant, MermaidCardConfig, NodeBinding } from './types';
+import type { HassEntity, HomeAssistant, MermaidCardConfig, NodeBinding } from './types';
 
 export const EDITOR_ELEMENT_NAME = 'mermaid-card-editor';
 const MDI_DELETE = 'M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z';
@@ -25,6 +25,29 @@ const toMap = (rows: Binding[]): Record<string, string | NodeBinding> =>
           : entity,
       ]),
   );
+
+/**
+ * The one entity that obviously belongs to a node: its friendly name is the node's text, or else
+ * its object id is the node id. Several candidates mean no suggestion rather than a guess.
+ */
+export function suggestEntity(id: string, text: string | undefined, states: Record<string, HassEntity>): string {
+  const name = text?.trim().toLowerCase();
+  const entities = Object.values(states);
+  for (const matches of [
+    name
+      ? entities.filter(
+          (e) =>
+            String(e.attributes.friendly_name ?? '')
+              .trim()
+              .toLowerCase() === name,
+        )
+      : [],
+    entities.filter((e) => e.entity_id.split('.')[1] === id.toLowerCase()),
+  ]) {
+    if (matches.length) return matches.length === 1 ? matches[0].entity_id : '';
+  }
+  return '';
+}
 
 export class MermaidCardEditor extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -156,6 +179,14 @@ export class MermaidCardEditor extends LitElement {
     this._emit(config);
   }
 
+  /** Fills in the matching entity when a node is picked for a row that has none yet. */
+  private _suggest(old: Binding, row: Binding): Binding {
+    // Only on a newly picked node: an entity the user cleared stays cleared.
+    if (!row.node || row.node === old.node || row.entity || !this.hass) return row;
+    const text = this._nodes.find((node) => node.id === row.node)?.text;
+    return { ...row, entity: suggestEntity(row.node, text, this.hass.states) };
+  }
+
   private _label = (schema: { name: string }) => localize(this.hass, `editor.${schema.name}`);
   // The entity picker draws its label above the field, which pushes it below the node field
   // beside it; it is self-explanatory with its own placeholder.
@@ -263,7 +294,9 @@ export class MermaidCardEditor extends LitElement {
                 .computeLabel=${this._rowLabel}
                 @value-changed=${(event: CustomEvent<{ value: Binding }>) =>
                   this._rowsChanged(
-                    this._rows.map((old, i) => (i === index ? { ...old, ...event.detail.value } : old)),
+                    this._rows.map((old, i) =>
+                      i === index ? this._suggest(old, { ...old, ...event.detail.value }) : old,
+                    ),
                   )}
               ></ha-form>
               <ha-icon-button
