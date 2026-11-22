@@ -91,6 +91,15 @@ export class MermaidCard extends LitElement {
     return 4;
   }
 
+  /**
+   * Sections-view sizing. Diagrams are wide, so the card takes the whole section by default instead
+   * of the grid's half, where a journey or timeline ends up scrolling. An instance method: hui-card
+   * reads it off the element.
+   */
+  public getGridOptions() {
+    return { columns: 'full', min_columns: 3, rows: 'auto', min_rows: 1 };
+  }
+
   public connectedCallback(): void {
     super.connectedCallback();
     this._renderedKey = undefined; // the SVG is gone if Lit re-renders after a reconnect

@@ -53,6 +53,10 @@ describe('bindNodes', () => {
 });
 
 describe('MermaidCard', () => {
+  it('takes the whole section by default', () => {
+    expect(new MermaidCard().getGridOptions()).toMatchObject({ columns: 'full', rows: 'auto' });
+  });
+
   it('rejects a config without content', () => {
     expect(() => new MermaidCard().setConfig({ type: 'custom:mermaid-card' } as never)).toThrow(/content/);
   });
