@@ -62,6 +62,10 @@ test('renders live template values and follows the bound entity', async ({ page,
   await expect(boiler).toContainText('61.0 °C');
   await expect.poll(pumpFill).toContain('--state-switch-active-color');
   await expect(flow).toHaveClass(/edge-animation-fast/);
+  // Dashed is not enough: the dashes must move along the edge.
+  const offset = () => flow.evaluate((path) => getComputedStyle(path).strokeDashoffset);
+  const before = await offset();
+  await expect.poll(offset).not.toBe(before);
 
   await pump.click();
   await expect(page.locator('ha-more-info-dialog')).toContainText('E2E heat pump');

@@ -85,7 +85,12 @@ export function bindNodes(
         : edge.style.animation || 'fast');
       edge.classList.toggle('edge-animation-fast', Boolean(color) && own === 'fast');
       edge.classList.toggle('edge-animation-slow', Boolean(color) && own === 'slow');
-      if (own !== 'fast' && own !== 'slow') edge.style.animation = color ? own : 'none';
+      if (own === 'fast' || own === 'slow') {
+        // Mermaid pins an edge it does not animate at offset 0, where the dash keyframes would then
+        // start and end: the line dashed, but standing still. Start where Mermaid's own classes do.
+        const pinned = (edge.dataset.ownDashoffset ??= edge.style.strokeDashoffset);
+        edge.style.strokeDashoffset = color ? '900px' : pinned;
+      } else edge.style.animation = color ? own : 'none';
       if (color) edge.style.setProperty('stroke', color, 'important');
       else edge.style.removeProperty('stroke');
       colorMarkers(edge, color);

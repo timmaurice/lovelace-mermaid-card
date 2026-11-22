@@ -97,6 +97,16 @@ describe('bindNodes', () => {
     expect(own.style.animation).toMatch(/\bdash\b/); // the classDef's own animation again
   });
 
+  it('starts a bound edge’s dashes where they can move, and puts it back when off', () => {
+    const root = document.createElement('div');
+    root.innerHTML = '<svg><path data-id="e1" style="stroke-dashoffset: 0"></path></svg>'; // as Mermaid draws it
+    const edge = root.querySelector('path')!;
+    bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'on') }, vi.fn());
+    expect(edge.style.strokeDashoffset).toBe('900px');
+    bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'off') }, vi.fn());
+    expect(edge.style.strokeDashoffset).toBe('0');
+  });
+
   it('animates a bound edge while its entity is active', () => {
     const root = document.createElement('div');
     root.innerHTML =
