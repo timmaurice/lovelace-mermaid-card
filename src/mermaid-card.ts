@@ -116,12 +116,17 @@ export class MermaidCard extends LitElement {
       throw new Error('entities must map Mermaid node ids to entity ids');
     }
     for (const value of Object.values(config.entities ?? {})) {
-      if (typeof toBinding(value)?.entity !== 'string') {
+      const binding = toBinding(value);
+      if (typeof binding?.entity !== 'string') {
         throw new Error('each entry of entities must be an entity id, or a mapping with an entity');
       }
-      const activeWhen = toBinding(value).active_when;
+      const activeWhen = binding.active_when;
       if (activeWhen !== undefined && ![activeWhen].flat().every((state) => typeof state === 'string')) {
         throw new Error('active_when must be a state or a list of states, numbers in quotes');
+      }
+      if (binding.speed !== undefined && binding.speed !== 'auto') throw new Error('speed must be auto');
+      if (binding.max !== undefined && !(typeof binding.max === 'number' && binding.max > 0)) {
+        throw new Error('max must be a positive number, the value at full speed');
       }
     }
     if (config.direction !== undefined && !DIRECTIONS.includes(config.direction)) {

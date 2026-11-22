@@ -25,6 +25,12 @@
     "active_when_helper": "Nur in diesen Zuständen hervorheben, z. B. ein Knoten je Zustand derselben Entität. Leer: jeder aktive Zustand.",
     "tap_action": "Aktion beim Tippen",
     "hold_action": "Aktion beim Gedrückthalten",
+    "speed": "Geschwindigkeit",
+    "speed_options": {
+      "off": "Wie im Diagramm",
+      "auto": "Nach dem Wert der Entität"
+    },
+    "max": "Wert bei voller Geschwindigkeit (Standard 10000)",
     "stale_binding": "Dieser Knoten ist nicht im Diagramm.",
     "direction_options": {
       "TB": "Von oben nach unten",

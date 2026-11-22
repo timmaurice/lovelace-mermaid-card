@@ -65,14 +65,14 @@ Mermaid itself is bundled into the card (about 1.6 MB compressed) but only run w
 
 The card has a visual editor. Pick the **Diagram type** from a dropdown; switching it on an empty diagram or an untouched example fills in an example of the new type. Mermaid pasted with its first line (`flowchart LR`, …) is understood: the editor moves the type and direction into their fields. A first line that says more, like `pie showData`, stays in the diagram. Under **Bound nodes** you pick a node from a list the editor reads from your diagram, and an entity for it. When exactly one entity's friendly name matches the node's text, or its object id the node id, it is filled in for you. In a flowchart, **Add an entity as a node** appends a node with the entity's name and state and binds it in one step.
 
-| Option         | Type   | Required | Description                                                                                                                                       |
-| -------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `content`      | string | yes      | The diagram. May contain templates (`{{ states('sensor.x') }}`). A first line naming the type (`flowchart LR`, `sequenceDiagram`, …) is optional. |
-| `diagram_type` | string | no       | Mermaid diagram type when `content` has no first line naming one: `flowchart` (default), `sequenceDiagram`, `stateDiagram-v2`, `pie`, …           |
-| `title`        | string | no       | Card header.                                                                                                                                      |
-| `entities`     | map    | no       | Node or edge id → entity id, or a mapping with `entity`, `active_when`, `tap_action`, `hold_action`. For flowcharts, state, class diagrams.       |
-| `direction`    | string | no       | A flowchart's direction: `TB` (top to bottom, the default), `BT`, `LR` or `RL`. Overrides a direction in the content's first line.                |
-| `scale`        | number | no       | Size in percent of the diagram's natural size, e.g. `70`. Default `100` fits the diagram to the card.                                             |
+| Option         | Type   | Required | Description                                                                                                                                                              |
+| -------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `content`      | string | yes      | The diagram. May contain templates (`{{ states('sensor.x') }}`). A first line naming the type (`flowchart LR`, `sequenceDiagram`, …) is optional.                        |
+| `diagram_type` | string | no       | Mermaid diagram type when `content` has no first line naming one: `flowchart` (default), `sequenceDiagram`, `stateDiagram-v2`, `pie`, …                                  |
+| `title`        | string | no       | Card header.                                                                                                                                                             |
+| `entities`     | map    | no       | Node or edge id → entity id, or a mapping with `entity`, `active_when`, `tap_action`, `hold_action`, an edge's `speed` and `max`. For flowcharts, state, class diagrams. |
+| `direction`    | string | no       | A flowchart's direction: `TB` (top to bottom, the default), `BT`, `LR` or `RL`. Overrides a direction in the content's first line.                                       |
+| `scale`        | number | no       | Size in percent of the diagram's natural size, e.g. `70`. Default `100` fits the diagram to the card.                                                                    |
 
 ```yaml
 type: custom:mermaid-card
@@ -124,6 +124,16 @@ entities:
 ```
 
 On a bound edge, `active_when` decides when it moves. Numbers go in quotes (`active_when: "3"`).
+
+With `speed: auto` the edge moves faster the higher its entity's value, like an energy-flow card: from Mermaid's slow speed near zero to four times its fast speed at `max` (default `10000`). The value counts on a log scale, so 50 W still visibly moves next to 5 kW. A negative value (export to the grid) moves just as fast, in the other direction. The edge keeps its dash pattern, and still only moves while the value is not zero.
+
+```yaml
+entities:
+  pv:
+    entity: sensor.solar_power
+    speed: auto
+    max: 8000 # W at full speed; for a sensor in kW, e.g. max: 8
+```
 
 A diagram shrinks to fit the card down to three quarters of its natural size; beyond that it scrolls sideways, so the text stays readable. For a narrow card, `direction: TD` usually fits better than a wide `LR` flowchart. When a diagram does not fit, a button in the card's corner opens it at full size in a dialog, where bound nodes still work.
 

@@ -36,6 +36,16 @@ export function isActive(entity: HassEntity | undefined, activeWhen?: string | s
 export const toBinding = (value: string | NodeBinding): NodeBinding =>
   typeof value === 'string' ? { entity: value } : value;
 
+/**
+ * Seconds one run of Mermaid's dash keyframes takes for a `speed: auto` edge: from 50 s (Mermaid's
+ * slow) for a value near zero to 5 s at `max`. The value goes in on a log scale, so a few watts
+ * still visibly move next to kilowatts; the speed in between is linear in that, not the duration.
+ */
+export function edgeDuration(value: number, max = 10000): number {
+  const fraction = Math.min(1, Math.log1p(Math.abs(value)) / Math.log1p(max));
+  return Math.round((900 / (18 + fraction * (180 - 18))) * 10) / 10; // the keyframes run 900 px
+}
+
 // A press this long is a hold, Home Assistant's own threshold.
 const HOLD_MS = 500;
 
@@ -104,7 +114,14 @@ export function bindNodes(
         // start and end: the line dashed, but standing still. Start where Mermaid's own classes do.
         const pinned = (edge.dataset.ownDashoffset ??= edge.style.strokeDashoffset);
         edge.style.strokeDashoffset = color ? '900px' : pinned;
-      } else edge.style.animation = color ? own : 'none';
+      } else edge.style.animation = color ? own : 'none'; // which also resets the longhands below
+      // `speed: auto` sets only duration and direction: dash pattern and keyframes stay the diagram's.
+      const value = Number(entity?.state);
+      const auto = Boolean(color) && binding.speed === 'auto' && Number.isFinite(value);
+      if (auto || own === 'fast' || own === 'slow') {
+        edge.style.animationDuration = auto ? `${edgeDuration(value, binding.max)}s` : '';
+        edge.style.animationDirection = auto && value < 0 ? 'reverse' : ''; // e.g. export to the grid
+      }
       if (color) edge.style.setProperty('stroke', color, 'important');
       else edge.style.removeProperty('stroke');
       colorMarkers(edge, color);

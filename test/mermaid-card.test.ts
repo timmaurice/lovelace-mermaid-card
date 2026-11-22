@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { bindNodes, isActive, stateColor } from '../src/entities';
+import { bindNodes, edgeDuration, isActive, stateColor } from '../src/entities';
 import { TEMPLATE, type HassEntity, type HomeAssistant, type MermaidCardConfig } from '../src/types';
 
 const render = vi.fn(async () => ({
@@ -143,6 +143,44 @@ describe('bindNodes', () => {
     expect(edge.style.strokeDashoffset).toBe('900px');
     bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'off') }, vi.fn());
     expect(edge.style.strokeDashoffset).toBe('0');
+  });
+
+  it('maps a value to a duration on a log scale, from slow near zero to fast at max', () => {
+    expect(edgeDuration(0)).toBe(50);
+    expect(edgeDuration(10000)).toBe(5);
+    expect(edgeDuration(50000)).toBe(5); // past max stays at full speed
+    expect(edgeDuration(-300)).toBe(edgeDuration(300));
+    expect(edgeDuration(10)).toBeGreaterThan(edgeDuration(100));
+    expect(edgeDuration(100)).toBeGreaterThan(edgeDuration(1000));
+    expect(edgeDuration(3, 10)).toBeLessThan(edgeDuration(3)); // a kW sensor with max: 10
+  });
+
+  it('sets duration and direction inline for speed: auto, and only there', () => {
+    const root = document.createElement('div');
+    root.innerHTML =
+      '<svg><path data-id="pv" style="stroke-dashoffset: 0"></path><path data-id="plain"></path>' +
+      '<path data-id="own" style="animation: dash 25s linear infinite"></path></svg>';
+    const [pv, plain, own] = root.querySelectorAll<SVGPathElement>('path');
+    const bind = (state: string) =>
+      bindNodes(
+        root,
+        { pv: { entity: 'sensor.grid', speed: 'auto', max: 5000 }, plain: 'sensor.grid', own: 'sensor.grid' },
+        { 'sensor.grid': entity('sensor.grid', state) },
+        vi.fn(),
+      );
+
+    bind('5000');
+    expect(pv.style.animationDuration).toBe('5s');
+    expect(pv.style.animationDirection).toBe('');
+    expect(pv.classList.contains('edge-animation-fast')).toBe(true); // dash pattern and keyframes stay Mermaid's
+    expect(plain.style.animationDuration).toBe('');
+    expect(own.style.animation).toMatch(/\b25s\b/); // a classDef's own speed is untouched
+    bind('-5000'); // export: the other way round
+    expect(pv.style.animationDirection).toBe('reverse');
+    bind('0');
+    expect(pv.style.animationDuration).toBe('');
+    expect(pv.style.animationDirection).toBe('');
+    expect(pv.classList.contains('edge-animation-fast')).toBe(false);
   });
 
   it('animates a bound edge while its entity is active', () => {
@@ -373,6 +411,19 @@ describe('sizeDiagram', () => {
     expect([svg.style.maxWidth, svg.style.minWidth]).toEqual(['400px', '300px']);
   });
 
+  it('rejects a speed other than auto, and a max that is not a positive number', () => {
+    const config = (binding: object) => ({
+      type: 'custom:mermaid-card',
+      content: 'A e1@--> B',
+      entities: { e1: binding },
+    });
+    expect(() => new MermaidCard().setConfig(config({ entity: 'sensor.p', speed: 'fast' }) as never)).toThrow(/speed/);
+    expect(() => new MermaidCard().setConfig(config({ entity: 'sensor.p', speed: 'auto', max: 0 }) as never)).toThrow(
+      /max/,
+    );
+    new MermaidCard().setConfig(config({ entity: 'sensor.p', speed: 'auto', max: 5000 }) as never);
+  });
+
   it('rejects a scale that is not a positive number', () => {
     expect(() =>
       new MermaidCard().setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR', scale: '150%' as never }),
@@ -405,13 +456,13 @@ describe('MermaidCardEditor', () => {
     editor.remove();
   });
 
-  it('offers actions for a bound node, not for a bound edge', async () => {
+  it('offers actions for a bound node, a speed for a bound edge', async () => {
     const editor = new MermaidCardEditor();
     editor.hass = makeHass({});
     editor.setConfig({
       type: 'custom:mermaid-card',
       content: 'A --> B',
-      entities: { A: 'light.a', L_A_B_0: 'light.a' },
+      entities: { A: 'light.a', L_A_B_0: { entity: 'sensor.p', speed: 'auto' } },
     });
     (editor as unknown as { _nodes: unknown[] })._nodes = [
       { id: 'A', label: 'A', text: '' },
@@ -424,7 +475,7 @@ describe('MermaidCardEditor', () => {
     );
     expect(schemas).toEqual([
       ['', 'active_when', 'tap_action', 'hold_action'],
-      ['', 'active_when'],
+      ['', 'active_when', 'speed', 'max'], // max only once the speed follows the value
     ]);
     editor.remove();
   });
@@ -454,10 +505,17 @@ describe('MermaidCardEditor', () => {
     const editor = new MermaidCardEditor();
     const emitted: { entities?: Record<string, unknown> }[] = [];
     editor.addEventListener('config-changed', (event) => emitted.push((event as CustomEvent).detail.config));
-    const entities = { A: { entity: 'light.a', hold_action: { action: 'toggle' } }, B: 'switch.b' };
-    editor.setConfig({ type: 'custom:mermaid-card', content: 'A --> B', entities });
+    const entities = {
+      A: { entity: 'light.a', hold_action: { action: 'toggle' } },
+      B: 'switch.b',
+      e1: { entity: 'sensor.p', speed: 'auto' as const, max: 5000 },
+    };
+    editor.setConfig({ type: 'custom:mermaid-card', content: 'A e1@--> B', entities });
     internals(editor)._rowsChanged(internals(editor)._rows);
     expect(emitted.at(-1)!.entities).toEqual(entities);
+    // The dropdown's "as in the diagram" leaves only the entity, its max with the speed.
+    internals(editor)._rowsChanged([{ node: 'e1', entity: 'sensor.p', speed: 'off', max: 5000 } as never]);
+    expect(emitted.at(-1)!.entities).toEqual({ e1: 'sensor.p' });
   });
 
   it('keeps active_when, as a state or a list, and drops it when emptied', () => {

@@ -56,6 +56,7 @@ entities:
   Docked: { entity: input_select.robot_vacuum, active_when: [Docked, Charging] }
   Cleaning: { entity: input_select.robot_vacuum, active_when: Cleaning }
 ```
+- `speed: auto` on an edge binding moves it faster the higher the entity's value (absolute; a negative value moves backwards), from slow near zero to full speed at `max` (default 10000) on a log scale. Set `max` in the sensor's unit: `8000` for W, `8` for kW. Only the duration changes; the dash pattern stays the diagram's. `entities: { pv: { entity: sensor.solar_power, speed: auto, max: 8000 } }`
 
 ## Template patterns
 

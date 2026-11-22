@@ -33,6 +33,10 @@ export interface NodeBinding {
   active_when?: string | string[];
   tap_action?: ActionConfig;
   hold_action?: ActionConfig;
+  /** Edges only: `auto` moves the edge faster the higher its entity's value. */
+  speed?: 'auto';
+  /** With `speed: auto`, the value (absolute) at full speed. Default 10000. */
+  max?: number;
 }
 
 export interface MermaidCardConfig {

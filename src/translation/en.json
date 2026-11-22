@@ -25,6 +25,12 @@
     "active_when_helper": "Light up only in these states, e.g. one node per state of the same entity. Empty: any active state.",
     "tap_action": "Tap action",
     "hold_action": "Hold action",
+    "speed": "Speed",
+    "speed_options": {
+      "off": "As in the diagram",
+      "auto": "By the entity's value"
+    },
+    "max": "Value at full speed (default 10000)",
     "stale_binding": "This node is not in the diagram.",
     "direction_options": {
       "TB": "Top to bottom",

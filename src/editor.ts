@@ -14,22 +14,20 @@ interface Binding extends NodeBinding {
   node: string;
 }
 
-/** The config's entities: a plain entity id per node, the long form only where there is more. */
+/** The config's entities: a plain entity id per node, the long form only where it says more. */
 const toMap = (rows: Binding[]): Record<string, string | NodeBinding> =>
   Object.fromEntries(
     rows
       .filter((row) => row.node && row.entity)
-      .map(({ node, entity, active_when, tap_action, hold_action }) => [
-        node,
-        active_when?.length || tap_action || hold_action
-          ? {
-              entity,
-              ...(active_when?.length && { active_when }),
-              ...(tap_action && { tap_action }),
-              ...(hold_action && { hold_action }),
-            }
-          : entity,
-      ]),
+      .map(({ node, entity, active_when, tap_action, hold_action, speed, max }) => {
+        const more = {
+          ...(active_when?.length && { active_when }),
+          ...(tap_action && { tap_action }),
+          ...(hold_action && { hold_action }),
+          ...(speed === 'auto' && { speed, ...(max && { max }) }),
+        };
+        return [node, Object.keys(more).length ? { entity, ...more } : entity];
+      }),
   );
 
 /**
@@ -351,7 +349,7 @@ export class MermaidCardEditor extends LitElement {
               ></ha-icon-button>
               <ha-form
                 .hass=${this.hass}
-                .data=${row}
+                .data=${{ ...row, speed: row.speed ?? 'off' }}
                 .schema=${[
                   {
                     type: 'grid',
@@ -384,9 +382,25 @@ export class MermaidCardEditor extends LitElement {
                       },
                     },
                   },
-                  // Edges are not tappable, so actions on them would do nothing.
+                  // Edges are not tappable, so actions on them would do nothing; they take a speed.
                   ...(edges.has(row.node)
-                    ? []
+                    ? [
+                        {
+                          name: 'speed',
+                          selector: {
+                            select: {
+                              mode: 'dropdown',
+                              options: ['off', 'auto'].map((value) => ({
+                                value,
+                                label: localize(this.hass, `editor.speed_options.${value}`),
+                              })),
+                            },
+                          },
+                        },
+                        ...(row.speed === 'auto'
+                          ? [{ name: 'max', selector: { number: { min: 0, mode: 'box' } } }]
+                          : []),
+                      ]
                     : [
                         { name: 'tap_action', selector: { ui_action: { default_action: 'more-info' } } },
                         { name: 'hold_action', selector: { ui_action: { default_action: 'none' } } },
