@@ -104,8 +104,12 @@ export class MermaidCard extends LitElement {
     this._renderedKey = undefined;
   }
 
+  /** Masonry-view height in units of about 50 px; 4 until a diagram has been drawn. */
   public getCardSize(): number {
-    return 4;
+    // The rendered box, not the viewBox: the SVG may be shrunk to fit the card or scaled.
+    const height = this._diagram?.querySelector('svg')?.getBoundingClientRect().height;
+    if (!height) return 4;
+    return Math.max(1, Math.ceil(height / 50)) + (this._config?.title ? 1 : 0);
   }
 
   /**
