@@ -6,3 +6,6 @@
 default_config:
 
 frontend:
+
+# The automation diagram spec saves an automation through the config API.
+automation: !include automations.yaml

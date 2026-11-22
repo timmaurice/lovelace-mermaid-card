@@ -11,7 +11,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, appendFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -64,10 +64,19 @@ function assertBundleIsCurrent(): void {
  * configuration then, so `docker compose up` boots an instance the suite can
  * onboard. An existing configuration is left alone.
  */
-function seedConfig(): void {
-  if (existsSync(resolve(CONFIG_DIR, 'configuration.yaml'))) return;
-  mkdirSync(CONFIG_DIR, { recursive: true });
-  copyFileSync(CONFIG_SEED, resolve(CONFIG_DIR, 'configuration.yaml'));
+/** Seeds a missing config; returns whether an existing one had to change, which needs a restart. */
+function seedConfig(): boolean {
+  const config = resolve(CONFIG_DIR, 'configuration.yaml');
+  if (!existsSync(config)) {
+    mkdirSync(CONFIG_DIR, { recursive: true });
+    copyFileSync(CONFIG_SEED, config);
+  }
+  const automations = resolve(CONFIG_DIR, 'automations.yaml');
+  if (!existsSync(automations)) writeFileSync(automations, '[]\n');
+  // A config seeded before the automation spec existed does not load automations yet.
+  if (readFileSync(config, 'utf8').includes('automations.yaml')) return false;
+  appendFileSync(config, '\nautomation: !include automations.yaml\n');
+  return true;
 }
 
 /** Brings the repository's own compose environment up if it is not running. */
@@ -79,8 +88,9 @@ export function ensureRunning(): void {
     throw new Error(`No ${BUNDLE} - run \`npm run build\` before the end-to-end suite`);
   }
   assertBundleIsCurrent();
-  seedConfig();
+  const changed = seedConfig();
   execFileSync('docker', ['compose', 'up', '-d'], { cwd: REPO_ROOT, stdio: 'inherit' });
+  if (changed) execFileSync('docker', ['compose', 'restart'], { cwd: REPO_ROOT, stdio: 'inherit' });
 }
 
 export async function waitForFrontend(timeoutMs = 180_000): Promise<void> {
@@ -260,6 +270,26 @@ export async function setState(
     body: JSON.stringify({ state, attributes }),
   });
   if (!res.ok) throw new Error(`setting ${entityId} failed: ${res.status} ${await res.text()}`);
+}
+
+/** Saves an automation through the config API, as the automation editor does; Home Assistant reloads it. */
+export async function saveAutomation(config: { id: string } & Record<string, unknown>): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/config/automation/config/${config.id}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${readTokens().access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) throw new Error(`saving automation ${config.id} failed: ${res.status} ${await res.text()}`);
+}
+
+export async function removeAutomation(id: string): Promise<void> {
+  await fetch(`${BASE_URL}/api/config/automation/config/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${readTokens().access_token}` },
+  });
 }
 
 export async function removeState(entityId: string): Promise<void> {
