@@ -250,6 +250,27 @@ describe('MermaidCardEditor', () => {
   const internals = (editor: InstanceType<typeof MermaidCardEditor>) =>
     editor as unknown as { _rows: Rows; _nodes: unknown[]; _rowsChanged(rows: Rows): void };
 
+  it('offers actions for a bound node, not for a bound edge', async () => {
+    const editor = new MermaidCardEditor();
+    editor.hass = makeHass({});
+    editor.setConfig({
+      type: 'custom:mermaid-card',
+      content: 'A --> B',
+      entities: { A: 'light.a', L_A_B_0: 'light.a' },
+    });
+    (editor as unknown as { _nodes: unknown[] })._nodes = [
+      { id: 'A', label: 'A', text: '' },
+      { id: 'L_A_B_0', label: 'L_A_B_0 – A → B', text: '', edge: true },
+    ];
+    document.body.append(editor);
+    await editor.updateComplete;
+    const schemas = [...editor.shadowRoot!.querySelectorAll('.row ha-form')].map((form) =>
+      (form as unknown as { schema: { name: string }[] }).schema.map((item) => item.name),
+    );
+    expect(schemas).toEqual([['', 'actions'], ['']]);
+    editor.remove();
+  });
+
   it('keeps a half-filled row while writing only complete bindings to the config', () => {
     const editor = new MermaidCardEditor();
     const emitted: { entities?: Record<string, string> }[] = [];

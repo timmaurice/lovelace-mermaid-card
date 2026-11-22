@@ -26,6 +26,8 @@ export interface DiagramNode {
   label: string;
   /** The text the node shows, without its id. */
   text: string;
+  /** An edge: it can show its entity, but takes no tap or hold. */
+  edge?: boolean;
 }
 
 /**
@@ -57,7 +59,7 @@ export async function listNodes(text: string): Promise<{ nodes: DiagramNode[]; e
           }),
         ...edges
           .filter((edge) => edge.id)
-          .map((edge) => ({ id: edge.id!, label: `${edge.id} – ${edge.start} → ${edge.end}`, text: '' })),
+          .map((edge) => ({ id: edge.id!, label: `${edge.id} – ${edge.start} → ${edge.end}`, text: '', edge: true })),
       ],
     };
   } catch {

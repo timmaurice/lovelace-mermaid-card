@@ -249,6 +249,7 @@ export class MermaidCardEditor extends LitElement {
     const used = new Set(this._rows.map((row) => row.node));
     // No ids means nothing to judge by: a type without bindable nodes, or text that did not parse.
     const known = this._nodes.length ? new Set(this._nodes.map((node) => node.id)) : undefined;
+    const edges = new Set(this._nodes.filter((node) => node.edge).map((node) => node.id));
     const data = this._formData(this._config);
     const type = data.diagram_type;
     // A type the dropdown does not list (gitGraph, sankey, …) is still shown as it is.
@@ -330,15 +331,20 @@ export class MermaidCardEditor extends LitElement {
                       { name: 'entity', selector: { entity: {} } },
                     ],
                   },
-                  {
-                    type: 'expandable',
-                    name: 'actions',
-                    flatten: true,
-                    schema: [
-                      { name: 'tap_action', selector: { ui_action: { default_action: 'more-info' } } },
-                      { name: 'hold_action', selector: { ui_action: { default_action: 'none' } } },
-                    ],
-                  },
+                  // Edges are not tappable, so actions on them would do nothing.
+                  ...(edges.has(row.node)
+                    ? []
+                    : [
+                        {
+                          type: 'expandable',
+                          name: 'actions',
+                          flatten: true,
+                          schema: [
+                            { name: 'tap_action', selector: { ui_action: { default_action: 'more-info' } } },
+                            { name: 'hold_action', selector: { ui_action: { default_action: 'none' } } },
+                          ],
+                        },
+                      ]),
                 ]}
                 .computeLabel=${this._rowLabel}
                 @value-changed=${(event: CustomEvent<{ value: Binding }>) =>
