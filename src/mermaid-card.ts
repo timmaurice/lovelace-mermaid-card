@@ -308,6 +308,7 @@ export class MermaidCard extends LitElement {
       // git0 is also the mind map's root, gitBranchLabel0 its text.
       vars[`git${index}`] = color;
       vars[`gitBranchLabel${index}`] = '#ffffff';
+      vars[`fillType${index}`] = color; // user journey sections
     });
     return Object.fromEntries(Object.entries(vars).filter(([, value]) => value));
   }
