@@ -8,6 +8,7 @@ A Home Assistant Lovelace card that renders [Mermaid](https://mermaid.js.org/) d
 
 - **Live values:** the diagram source is a Home Assistant template, so labels can show states.
 - **Bound nodes:** map a node to an entity and it is coloured by that entity's state; tapping it opens more-info.
+- **Live flows:** map an edge to an entity and it animates while that entity is active.
 - **AI friendly:** any Mermaid an assistant writes can go straight into `content` (or into a sensor attribute the template reads).
 
 ## Configuration
@@ -19,7 +20,7 @@ The card has a visual editor. Pick the **Diagram type** from a dropdown; switchi
 | `content`      | string | yes      | The diagram. May contain templates (`{{ states('sensor.x') }}`). A first line naming the type (`flowchart LR`, `sequenceDiagram`, …) is optional. |
 | `diagram_type` | string | no       | Mermaid diagram type when `content` has no first line naming one: `flowchart` (default), `sequenceDiagram`, `stateDiagram-v2`, `pie`, …           |
 | `title`        | string | no       | Card header.                                                                                                                                      |
-| `entities`     | map    | no       | Node id → entity id. Works for flowchart, state and class diagrams.                                                                               |
+| `entities`     | map    | no       | Node or edge id → entity id. Works for flowchart, state and class diagrams.                                                                       |
 | `direction`    | string | no       | A flowchart's direction: `TB` (top to bottom, the default), `BT`, `LR` or `RL`. Overrides a direction in the content's first line.                |
 | `scale`        | number | no       | Size in percent of the diagram's natural size, e.g. `70`. Default `100` fits the diagram to the card.                                             |
 
@@ -33,6 +34,21 @@ content: |
 entities:
   HP: switch.heat_pump
   LR: climate.living_room
+```
+
+### Bound nodes and edges
+
+A bound node takes its entity's state colour, and tapping it opens more-info.
+
+An edge is bound by its id. Name it with Mermaid's `@` syntax (`HP e1@--> BOIL`) or use the id the editor lists. While its entity is on, open, heating or a number other than zero, the edge animates in the entity's colour.
+
+```yaml
+type: custom:mermaid-card
+content: |
+  PUMP[Heat pump] flow@--> BOIL[Boiler]
+entities:
+  PUMP: switch.heat_pump
+  flow: sensor.heat_pump_power
 ```
 
 A diagram shrinks to fit the card down to three quarters of its natural size; beyond that it scrolls sideways, so the text stays readable. For a narrow card, `direction: TD` usually fits better than a wide `LR` flowchart.

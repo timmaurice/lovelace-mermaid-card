@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { bindNodes, stateColor } from '../src/entities';
+import { bindNodes, isActive, stateColor } from '../src/entities';
 import type { HassEntity, HomeAssistant } from '../src/types';
 
 const render = vi.fn(async () => ({
@@ -31,6 +31,16 @@ describe('stateColor', () => {
     expect(stateColor(undefined)).toContain('--state-unavailable-color');
     expect(stateColor(entity('sensor.t', '21.5'))).toBeUndefined();
   });
+
+  it('counts on, heating and non-zero numbers as active', () => {
+    expect(isActive(entity('light.a', 'on'))).toBe(true);
+    expect(isActive(entity('climate.a', 'heat'))).toBe(true);
+    expect(isActive(entity('sensor.p', '-120'))).toBe(true);
+    expect(isActive(entity('sensor.p', '0'))).toBe(false);
+    expect(isActive(entity('light.a', 'off'))).toBe(false);
+    expect(isActive(entity('light.a', 'unavailable'))).toBe(false);
+    expect(isActive(undefined)).toBe(false);
+  });
 });
 
 describe('bindNodes', () => {
@@ -49,6 +59,18 @@ describe('bindNodes', () => {
     a.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     expect(onTap).toHaveBeenCalledTimes(2);
     expect(onTap).toHaveBeenCalledWith('light.a');
+  });
+
+  it('animates a bound edge while its entity is active', () => {
+    const root = document.createElement('div');
+    root.innerHTML = '<svg><path data-id="e1"></path><g data-id="e1"></g></svg>';
+    const edge = root.querySelector('path')!;
+    bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'on') }, vi.fn());
+    expect(edge.classList.contains('edge-animation-fast')).toBe(true);
+    expect(edge.style.getPropertyValue('stroke')).toContain('--state-switch-active-color');
+    bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'off') }, vi.fn());
+    expect(edge.classList.contains('edge-animation-fast')).toBe(false);
+    expect(edge.style.getPropertyValue('stroke')).toBe('');
   });
 });
 

@@ -14,6 +14,12 @@ export function stateColor(entity: HassEntity | undefined): string | undefined {
     : `var(--state-${domain}-active-color, var(--state-active-color, var(--amber-color)))`;
 }
 
+/** Whether an entity counts as running: on, open, heating, or a number other than zero. */
+export function isActive(entity: HassEntity | undefined): boolean {
+  if (!entity?.state || UNAVAILABLE.has(entity.state) || INACTIVE.has(entity.state)) return false;
+  return Number(entity.state) !== 0; // NaN for text states, which count as active
+}
+
 /**
  * Colours the nodes named in `bindings` after their entity and makes them open more-info.
  * Mermaid gives a node no `data-id`, only a DOM id like `<render id>-flowchart-<node id>-<n>`
@@ -26,12 +32,22 @@ export function bindNodes(
   onTap: (entityId: string) => void,
 ): void {
   const nodes = [...root.querySelectorAll<SVGGElement>('.node')];
+  // Edges carry their id as data-id (clusters do too, but they are not paths).
+  const edges = [...root.querySelectorAll<SVGPathElement>('path[data-id]')];
   for (const [nodeId, entityId] of Object.entries(bindings)) {
+    const entity = states[entityId];
+    for (const edge of edges.filter((candidate) => candidate.dataset.id === nodeId)) {
+      // Mermaid's own `animate: true` class, whose CSS every diagram already carries.
+      const active = isActive(entity);
+      edge.classList.toggle('edge-animation-fast', active);
+      if (active) edge.style.setProperty('stroke', stateColor(entity) ?? 'var(--state-active-color)', 'important');
+      else edge.style.removeProperty('stroke');
+    }
     const pattern = new RegExp(
       `(?:^|-)(?:flowchart|state|classId)-${nodeId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`,
     );
     for (const node of nodes.filter((candidate) => pattern.test(candidate.id))) {
-      const color = stateColor(states[entityId]);
+      const color = stateColor(entity);
       for (const shape of node.querySelectorAll<SVGElement>(
         ':scope > rect, :scope > polygon, :scope > circle, :scope > ellipse, :scope > path, :scope > g > path, :scope > g > rect',
       )) {
@@ -52,7 +68,7 @@ export function bindNodes(
       node.style.cursor = 'pointer';
       node.setAttribute('role', 'button');
       node.setAttribute('tabindex', '0');
-      node.setAttribute('aria-label', states[entityId]?.attributes.friendly_name ?? entityId);
+      node.setAttribute('aria-label', entity?.attributes.friendly_name ?? entityId);
       node.onclick = () => onTap(entityId);
       node.onkeydown = (event) => {
         if (event.key === 'Enter' || event.key === ' ') {

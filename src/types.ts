@@ -24,7 +24,10 @@ export interface MermaidCardConfig {
   content: string;
   /** Mermaid diagram type, used when the content has no header line of its own. Default flowchart. */
   diagram_type?: string;
-  /** Mermaid node id → entity id. Bound nodes are coloured by state and open more-info. */
+  /**
+   * Mermaid node or edge id → entity id. Bound nodes are coloured by state and open more-info;
+   * bound edges animate while their entity is active.
+   */
   entities?: Record<string, string>;
   /** Overrides a flowchart's direction, e.g. TD for a narrow card. */
   direction?: (typeof DIRECTIONS)[number];

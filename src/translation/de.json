@@ -9,7 +9,7 @@
     "scale": "Größe",
     "scale_helper": "Bei 100 % passt sich das Diagramm an die Karte an, weniger macht es kleiner.",
     "bindings": "Gebundene Knoten",
-    "bindings_helper": "Gebundene Knoten werden nach dem Zustand ihrer Entität eingefärbt; Tippen öffnet die Details.",
+    "bindings_helper": "Gebundene Knoten werden nach dem Zustand ihrer Entität eingefärbt; Tippen öffnet die Details. Gebundene Kanten bewegen sich, solange ihre Entität aktiv ist.",
     "node": "Knoten",
     "entity": "Entität",
     "add_binding": "Knoten binden",

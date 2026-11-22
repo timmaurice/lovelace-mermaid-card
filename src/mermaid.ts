@@ -11,7 +11,12 @@ export interface MermaidApi {
   parse(text: string): Promise<unknown>;
   mermaidAPI: {
     getDiagramFromText(text: string): Promise<{
-      db: { getVertices?(): NodeMap; getStates?(): NodeMap; getClasses?(): NodeMap };
+      db: {
+        getVertices?(): NodeMap;
+        getStates?(): NodeMap;
+        getClasses?(): NodeMap;
+        getEdges?(): { id?: string; start: string; end: string }[];
+      };
     }>;
   };
 }
@@ -23,8 +28,9 @@ export interface DiagramNode {
 
 /**
  * The nodes a diagram defines, read with Mermaid's own parser: flowchart vertices, states and
- * classes — the diagram types whose nodes the card can bind. Anything else, or text that does
- * not parse, yields no nodes. Expects rendered text: Mermaid cannot parse a template.
+ * classes — the diagram types whose nodes the card can bind — followed by a flowchart's edges.
+ * Anything else, or text that does not parse, yields no nodes. Expects rendered text: Mermaid
+ * cannot parse a template.
  */
 export async function listNodes(text: string): Promise<DiagramNode[]> {
   try {
@@ -33,12 +39,18 @@ export async function listNodes(text: string): Promise<DiagramNode[]> {
     const { db } = await mermaid.mermaidAPI.getDiagramFromText(text);
     const nodes = db.getVertices?.() ?? db.getStates?.() ?? db.getClasses?.();
     if (!(nodes instanceof Map)) return [];
-    return [...nodes]
-      .filter(([id]) => !id.startsWith('root_')) // a state diagram's [*] start and end
-      .map(([id, node]) => {
-        const label = String(node.text ?? node.label ?? '').replace(/<br\s*\/?>/gi, ' ');
-        return { id, label: label && label !== id ? `${id} – ${label}` : id };
-      });
+    const edges = (db.getVertices && db.getEdges?.()) || [];
+    return [
+      ...[...nodes]
+        .filter(([id]) => !id.startsWith('root_')) // a state diagram's [*] start and end
+        .map(([id, node]) => {
+          const label = String(node.text ?? node.label ?? '').replace(/<br\s*\/?>/gi, ' ');
+          return { id, label: label && label !== id ? `${id} – ${label}` : id };
+        }),
+      ...edges
+        .filter((edge) => edge.id)
+        .map((edge) => ({ id: edge.id!, label: `${edge.id} – ${edge.start} → ${edge.end}` })),
+    ];
   } catch {
     return [];
   }

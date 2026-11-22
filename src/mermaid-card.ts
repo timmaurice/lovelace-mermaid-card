@@ -293,6 +293,12 @@ export class MermaidCard extends LitElement {
     .diagram .node[role='button']:focus-visible {
       outline: 2px solid var(--primary-color);
     }
+    @media (prefers-reduced-motion: reduce) {
+      .diagram .edge-animation-fast,
+      .diagram .edge-animation-slow {
+        animation: none !important;
+      }
+    }
   `;
 }
 

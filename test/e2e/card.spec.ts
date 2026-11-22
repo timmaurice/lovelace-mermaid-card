@@ -64,11 +64,11 @@ test('the editor lists the diagram nodes for binding', async ({ page }) => {
   const editor = page.locator('mermaid-card-editor');
   await expect(editor).toBeVisible({ timeout: 30_000 });
 
-  // One row for the binding in the config, and both diagram nodes on offer.
+  // One row for the binding in the config, and both diagram nodes and their edge on offer.
   await expect(editor.locator('.row')).toHaveCount(1);
   await expect
     .poll(() =>
       editor.evaluate((element) => (element as unknown as { _nodes: { id: string }[] })._nodes.map((node) => node.id)),
     )
-    .toEqual(['HP', 'BOIL']);
+    .toEqual(['HP', 'BOIL', 'L_HP_BOIL_0']);
 });
