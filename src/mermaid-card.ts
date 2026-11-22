@@ -3,7 +3,7 @@ import { property, query, state } from 'lit/decorators.js';
 import { bindNodes } from './entities';
 import { loadMermaid } from './mermaid';
 import { EDITOR_ELEMENT_NAME } from './editor';
-import { EXAMPLES, withHeader } from './header';
+import { EXAMPLES, diagramType, withHeader } from './header';
 import { DIRECTIONS, type HomeAssistant, type MermaidCardConfig } from './types';
 
 const ELEMENT_NAME = 'mermaid-card';
@@ -51,6 +51,9 @@ export class MermaidCard extends LitElement {
   @state() private _config?: MermaidCardConfig;
   @state() private _text?: string;
   @state() private _error?: string;
+  /** The card's width, tracked only to redraw Gantt charts, which Mermaid draws at a fixed width. */
+  @state() private _width = 0;
+  private _resizeObserver?: ResizeObserver;
   @query('.diagram') private _diagram?: HTMLDivElement;
 
   private _unsubscribe?: Promise<() => Promise<void>>;
@@ -103,10 +106,18 @@ export class MermaidCard extends LitElement {
   public connectedCallback(): void {
     super.connectedCallback();
     this._renderedKey = undefined; // the SVG is gone if Lit re-renders after a reconnect
+    if (typeof ResizeObserver !== 'undefined') {
+      this._resizeObserver ??= new ResizeObserver(([entry]) => {
+        const width = Math.round(entry.contentRect.width);
+        if (width > 0 && Math.abs(width - this._width) > 8) this._width = width;
+      });
+      this._resizeObserver.observe(this);
+    }
   }
 
   public disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._resizeObserver?.disconnect();
     this._unsubscribeTemplate();
   }
 
@@ -114,7 +125,10 @@ export class MermaidCard extends LitElement {
     if (!this._config || !this.hass) return;
     if (!this._unsubscribe && TEMPLATE.test(this._config.content)) this._subscribeTemplate();
 
-    const key = `${this.hass.themes?.darkMode}\n${this._text}`;
+    // A Gantt chart is drawn for one width; the first render often sees the card before its layout.
+    const gantt =
+      this._text !== undefined && diagramType(withHeader(this._text, this._config.diagram_type)) === 'gantt';
+    const key = `${this.hass.themes?.darkMode}\n${this._text}${gantt ? `\n${this._width}` : ''}`;
     if (this._text !== undefined && key !== this._renderedKey) {
       this._renderedKey = key;
       void this._renderDiagram(this._text);
@@ -159,17 +173,14 @@ export class MermaidCard extends LitElement {
         theme: 'base',
         darkMode: Boolean(this.hass?.themes?.darkMode),
         themeVariables: this._themeVariables(),
-        // Gantt charts draw at a fixed width with small text; this one fills the card instead.
-        gantt: {
-          useWidth: Math.max((this._diagram?.clientWidth ?? 0) - 32, 320),
-          fontSize: 14,
-          sectionFontSize: 14,
-          barHeight: 24,
-        },
       });
+      const source = applyDirection(
+        withHeader(text, this._config?.diagram_type, this._config?.direction),
+        this._config?.direction,
+      );
       const { svg, bindFunctions } = await mermaid.render(
         `${ELEMENT_NAME}-${++renderCount}`,
-        applyDirection(withHeader(text, this._config?.diagram_type, this._config?.direction), this._config?.direction),
+        this._withGanttWidth(source),
       );
       if (token !== this._renderToken) return; // a newer render overtook this one
       await this.updateComplete;
@@ -183,6 +194,18 @@ export class MermaidCard extends LitElement {
       if (token !== this._renderToken) return;
       this._error = error instanceof Error ? error.message : String(error);
     }
+  }
+
+  /**
+   * Gantt charts draw at a fixed width with small text; this one fills the card instead. Passed as
+   * a directive in the diagram, not through initialize(): that config is global, and the cards of
+   * a dashboard render interleaved, so one card's width would land on another's chart.
+   */
+  private _withGanttWidth(source: string): string {
+    if (diagramType(source) !== 'gantt') return source;
+    const width = Math.max((this._width || this._diagram?.clientWidth || 0) - 32, 320);
+    const gantt = { useWidth: width, fontSize: 14, sectionFontSize: 14, barHeight: 24 };
+    return `${source}\n%%{init: ${JSON.stringify({ gantt })}}%%`;
   }
 
   private _bind(): void {
@@ -242,6 +265,9 @@ export class MermaidCard extends LitElement {
   }
 
   static styles = css`
+    :host {
+      display: block; /* an inline host reports no size to the ResizeObserver */
+    }
     ha-card {
       overflow: hidden;
     }

@@ -93,6 +93,24 @@ describe('MermaidCard', () => {
     card.remove();
   });
 
+  it('gives a Gantt chart the card width in the diagram itself, not in the shared config', async () => {
+    const card = new MermaidCard();
+    card.setConfig({
+      type: 'custom:mermaid-card',
+      content: '  section A\n  Wash :w, 08:00, 90m',
+      diagram_type: 'gantt',
+    });
+    card.hass = makeHass({});
+    document.body.append(card);
+    await vi.waitFor(() =>
+      expect(render).toHaveBeenLastCalledWith(
+        expect.any(String),
+        expect.stringMatching(/^gantt\n[\s\S]*%%\{init: \{"gantt":\{"useWidth":\d+/),
+      ),
+    );
+    card.remove();
+  });
+
   it('renders templated content through render_template and unsubscribes on removal', async () => {
     const unsubscribe = vi.fn(async () => undefined);
     let push: (message: unknown) => void = () => undefined;
