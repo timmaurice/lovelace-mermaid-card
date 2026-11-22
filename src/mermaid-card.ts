@@ -345,6 +345,8 @@ export class MermaidCard extends LitElement {
     const read = (name: string) => style.getPropertyValue(name).trim();
     const vars: Record<string, string> = {
       background: read('--ha-card-background') || read('--card-background-color'),
+      // Edge and icon labels sit on the card; Mermaid would make them black in dark mode.
+      edgeLabelBackground: read('--ha-card-background') || read('--card-background-color'),
       primaryColor: read('--secondary-background-color'),
       primaryBorderColor: read('--primary-color'),
       primaryTextColor: read('--primary-text-color'),
