@@ -21,6 +21,7 @@
     "actions": "Actions",
     "tap_action": "Tap action",
     "hold_action": "Hold action",
+    "stale_binding": "This node is not in the diagram.",
     "direction_options": {
       "TB": "Top to bottom",
       "BT": "Bottom to top",

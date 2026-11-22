@@ -168,6 +168,8 @@ export class MermaidCardEditor extends LitElement {
   protected render() {
     if (!this.hass || !this._config) return nothing;
     const used = new Set(this._rows.map((row) => row.node));
+    // No ids means nothing to judge by: a type without bindable nodes, or text that did not parse.
+    const known = this._nodes.length ? new Set(this._nodes.map((node) => node.id)) : undefined;
     const data = this._formData(this._config);
     const type = data.diagram_type;
     // A type the dropdown does not list (gitGraph, sankey, …) is still shown as it is.
@@ -270,6 +272,11 @@ export class MermaidCardEditor extends LitElement {
                 @click=${() => this._rowsChanged(this._rows.filter((_, i) => i !== index))}
               ></ha-icon-button>
             </div>
+            ${
+              known && row.node && !known.has(row.node)
+                ? html`<p class="stale">${localize(this.hass, 'editor.stale_binding')}</p>`
+                : nothing
+            }
           `,
         )}
         <ha-button @click=${() => this._rowsChanged([...this._rows, { node: '', entity: '' }])}>
@@ -301,6 +308,11 @@ export class MermaidCardEditor extends LitElement {
     }
     .row ha-form {
       flex: 1;
+    }
+    .stale {
+      margin: -4px 0 8px;
+      color: var(--warning-color);
+      font-size: 0.875rem;
     }
   `;
 }
