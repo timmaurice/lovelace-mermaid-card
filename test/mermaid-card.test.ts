@@ -7,10 +7,12 @@ const render = vi.fn(async () => ({
 }));
 vi.mock('../src/mermaid', () => ({
   loadMermaid: async () => ({ initialize: vi.fn(), render }),
-  listNodes: async () => [
-    { id: 'A', label: 'A – Heat pump' },
-    { id: 'B', label: 'B – Boiler' },
-  ],
+  listNodes: async () => ({
+    nodes: [
+      { id: 'A', label: 'A – Heat pump' },
+      { id: 'B', label: 'B – Boiler' },
+    ],
+  }),
 }));
 
 const { MermaidCard, applyDirection, sizeDiagram } = await import('../src/mermaid-card');

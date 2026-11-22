@@ -49,12 +49,29 @@ export function suggestEntity(id: string, text: string | undefined, states: Reco
   return '';
 }
 
+/**
+ * Mermaid's parse error for `text` as the content field can show it. The parsed text has a header
+ * line the field leaves out, so line numbers move up by one; an unexpected end is reported a line
+ * past the end. The code excerpt and its caret line are dropped: they only line up in a monospace
+ * block, and the alert collapses the line breaks.
+ */
+export function parseErrorText(message: string, text: string): string {
+  const last = Math.max(1, text.split('\n').length - 1);
+  const lines = message.split('\n');
+  const caret = lines.findIndex((line) => /^-*\^\s*$/.test(line));
+  if (caret > 0) lines.splice(caret - 1, 2);
+  return lines
+    .join(' ')
+    .replace(/\bline (\d+)/g, (_, line: string) => `line ${Math.min(last, Math.max(1, Number(line) - 1))}`);
+}
+
 export class MermaidCardEditor extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
   @state() private _config?: MermaidCardConfig;
   /** Rows as shown, including half-filled ones the config cannot hold yet. */
   @state() private _rows: Binding[] = [];
   @state() private _nodes: DiagramNode[] = [];
+  @state() private _parseError?: string;
   private _nodesFor?: string;
   private _nodesTimer?: ReturnType<typeof setTimeout>;
 
@@ -109,8 +126,12 @@ export class MermaidCardEditor extends LitElement {
     this._nodesFor = content;
     clearTimeout(this._nodesTimer);
     this._nodesTimer = setTimeout(async () => {
-      const nodes = await listNodes(await this._renderOnce(content));
-      if (content === this._nodesFor) this._nodes = nodes;
+      const { text, exact } = await this._renderOnce(content);
+      const { nodes, error } = await listNodes(text);
+      if (content !== this._nodesFor) return;
+      this._nodes = nodes;
+      // Blanked templates are only a guess at the text: an error there may not be in the content.
+      this._parseError = exact && error ? parseErrorText(error, text) : undefined;
     }, 400);
   }
 
@@ -118,23 +139,26 @@ export class MermaidCardEditor extends LitElement {
    * The content as the card will see it. Templates can hide Mermaid syntax — a hexagon `{{text}}`
    * is written `{{ '{{' }}text{{ '}}' }}` — so they are rendered by Home Assistant before parsing.
    * Without Home Assistant, or when rendering fails, the templates are blanked out instead; the
-   * ids usually survive that.
+   * ids usually survive that. `exact` tells which: only exact text is worth a parse error.
    */
-  private async _renderOnce(content: string): Promise<string> {
-    if (!/\{\{|\{%/.test(content)) return content;
-    const blanked = content.replace(/\{\{[\s\S]*?\}\}/g, '…').replace(/\{%[\s\S]*?%\}/g, '');
+  private async _renderOnce(content: string): Promise<{ text: string; exact: boolean }> {
+    if (!/\{\{|\{%/.test(content)) return { text: content, exact: true };
+    const blanked = {
+      text: content.replace(/\{\{[\s\S]*?\}\}/g, '…').replace(/\{%[\s\S]*?%\}/g, ''),
+      exact: false,
+    };
     const connection = this.hass?.connection;
     if (!connection) return blanked;
-    return new Promise<string>((resolve) => {
-      const done = (text: string) => {
+    return new Promise((resolve) => {
+      const done = (result: { text: string; exact: boolean }) => {
         clearTimeout(timer);
         unsubscribe.then((stop) => stop()).catch(() => undefined);
-        resolve(text);
+        resolve(result);
       };
       const timer = setTimeout(() => done(blanked), 3000);
       // Both callers of done() run asynchronously, after this assignment.
       const unsubscribe = connection.subscribeMessage<{ result?: string }>(
-        (message) => done(typeof message.result === 'string' ? message.result : blanked),
+        (message) => done(typeof message.result === 'string' ? { text: message.result, exact: true } : blanked),
         { type: 'render_template', template: content, report_errors: true },
       );
       unsubscribe.catch(() => done(blanked));
@@ -230,6 +254,7 @@ export class MermaidCardEditor extends LitElement {
       <ha-form
         .hass=${this.hass}
         .data=${data}
+        .error=${this._parseError ? { content: this._parseError } : undefined}
         .schema=${[
           { name: 'title', selector: { text: {} } },
           {

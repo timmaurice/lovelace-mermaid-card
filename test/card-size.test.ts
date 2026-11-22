@@ -3,7 +3,7 @@ import type { HomeAssistant } from '../src/types';
 
 vi.mock('../src/mermaid', () => ({
   loadMermaid: async () => ({ initialize: vi.fn(), render: async () => ({ svg: '<svg></svg>' }) }),
-  listNodes: async () => [],
+  listNodes: async () => ({ nodes: [] }),
 }));
 
 const { MermaidCard } = await import('../src/mermaid-card');

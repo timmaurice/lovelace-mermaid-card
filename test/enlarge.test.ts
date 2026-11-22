@@ -6,7 +6,7 @@ const render = vi.fn(async () => ({
 }));
 vi.mock('../src/mermaid', () => ({
   loadMermaid: async () => ({ initialize: vi.fn(), render }),
-  listNodes: async () => [],
+  listNodes: async () => ({ nodes: [] }),
 }));
 
 const { MermaidCard } = await import('../src/mermaid-card');

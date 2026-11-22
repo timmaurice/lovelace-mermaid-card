@@ -31,30 +31,37 @@ export interface DiagramNode {
 /**
  * The nodes a diagram defines, read with Mermaid's own parser: flowchart vertices, states and
  * classes — the diagram types whose nodes the card can bind — followed by a flowchart's edges.
- * Anything else, or text that does not parse, yields no nodes. Expects rendered text: Mermaid
- * cannot parse a template.
+ * Anything else, or text that does not parse, yields no nodes; text that does not parse also
+ * yields Mermaid's error message. Expects rendered text: Mermaid cannot parse a template.
  */
-export async function listNodes(text: string): Promise<DiagramNode[]> {
+export async function listNodes(text: string): Promise<{ nodes: DiagramNode[]; error?: string }> {
   try {
     const mermaid = await loadMermaid();
-    await mermaid.parse(text); // loads the diagram type, which getDiagramFromText needs
+    // Parsing also loads the diagram type, which getDiagramFromText needs.
+    const error = await mermaid.parse(text).then(
+      () => undefined,
+      (reason: unknown) => (reason instanceof Error ? reason.message : String(reason)),
+    );
+    if (error !== undefined) return { nodes: [], error };
     const { db } = await mermaid.mermaidAPI.getDiagramFromText(text);
     const nodes = db.getVertices?.() ?? db.getStates?.() ?? db.getClasses?.();
-    if (!(nodes instanceof Map)) return [];
+    if (!(nodes instanceof Map)) return { nodes: [] };
     const edges = (db.getVertices && db.getEdges?.()) || [];
-    return [
-      ...[...nodes]
-        .filter(([id]) => !id.startsWith('root_')) // a state diagram's [*] start and end
-        .map(([id, node]) => {
-          const text = String(node.text ?? node.label ?? '').replace(/<br\s*\/?>/gi, ' ');
-          return { id, label: text && text !== id ? `${id} – ${text}` : id, text };
-        }),
-      ...edges
-        .filter((edge) => edge.id)
-        .map((edge) => ({ id: edge.id!, label: `${edge.id} – ${edge.start} → ${edge.end}`, text: '' })),
-    ];
+    return {
+      nodes: [
+        ...[...nodes]
+          .filter(([id]) => !id.startsWith('root_')) // a state diagram's [*] start and end
+          .map(([id, node]) => {
+            const text = String(node.text ?? node.label ?? '').replace(/<br\s*\/?>/gi, ' ');
+            return { id, label: text && text !== id ? `${id} – ${text}` : id, text };
+          }),
+        ...edges
+          .filter((edge) => edge.id)
+          .map((edge) => ({ id: edge.id!, label: `${edge.id} – ${edge.start} → ${edge.end}`, text: '' })),
+      ],
+    };
   } catch {
-    return [];
+    return { nodes: [] };
   }
 }
 
