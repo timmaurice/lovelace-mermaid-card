@@ -12,7 +12,7 @@ A Home Assistant Lovelace card that renders [Mermaid](https://mermaid.js.org/) d
 
 ## Configuration
 
-The card has a visual editor. Under **Bound nodes** you pick a node from a list the editor reads from your diagram, and an entity for it.
+The card has a visual editor. The **Diagram type** dropdown reads and rewrites the first line of the diagram, so the source stays plain Mermaid. Under **Bound nodes** you pick a node from a list the editor reads from your diagram, and an entity for it.
 
 | Option      | Type   | Required | Description                                                                                                           |
 | ----------- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -20,6 +20,7 @@ The card has a visual editor. Under **Bound nodes** you pick a node from a list 
 | `title`     | string | no       | Card header.                                                                                                          |
 | `entities`  | map    | no       | Node id → entity id. Works for flowchart, state and class diagrams.                                                   |
 | `direction` | string | no       | Overrides a flowchart's direction: `TB`, `TD`, `BT`, `LR` or `RL`. Handy when the same diagram sits in a narrow card. |
+| `scale`     | number | no       | Size in percent of the diagram's natural size, e.g. `70`. Default `100` fits the diagram to the card.                 |
 
 ```yaml
 type: custom:mermaid-card

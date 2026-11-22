@@ -1,5 +1,6 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { property, state } from 'lit/decorators.js';
+import { DIAGRAM_TYPES, diagramType, setDiagramType } from './header';
 import { localize } from './localize';
 import { DiagramNode, listNodes } from './mermaid';
 import type { HomeAssistant, MermaidCardConfig } from './types';
@@ -89,10 +90,15 @@ export class MermaidCardEditor extends LitElement {
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config }, bubbles: true, composed: true }));
   }
 
-  private _formChanged(event: CustomEvent<{ value: Partial<MermaidCardConfig> }>): void {
-    const config = { ...this._config, ...event.detail.value } as MermaidCardConfig;
+  private _formChanged(event: CustomEvent<{ value: Partial<MermaidCardConfig> & { diagram_type?: string } }>): void {
+    // The type is not an option of its own: it lives in the first line of the content.
+    const { diagram_type: type, ...value } = event.detail.value;
+    const config = { ...this._config, ...value } as MermaidCardConfig;
+    if (type && type !== diagramType(config.content ?? '')) config.content = setDiagramType(config.content ?? '', type);
     if (!config.title) delete config.title;
-    if (!config.direction) delete config.direction;
+    // A direction only means something for a flowchart; it would linger unseen otherwise.
+    if (!config.direction || diagramType(config.content ?? '') !== 'flowchart') delete config.direction;
+    if (config.scale === 100) delete config.scale; // the default
     this._emit(config);
   }
 
@@ -115,27 +121,54 @@ export class MermaidCardEditor extends LitElement {
   protected render() {
     if (!this.hass || !this._config) return nothing;
     const used = new Set(this._rows.map((row) => row.node));
+    const type = diagramType(this._config.content ?? '');
+    // A type the dropdown does not list (gitGraph, sankey, …) is still shown as it is.
+    const types = [...DIAGRAM_TYPES, ...(type && !(DIAGRAM_TYPES as readonly string[]).includes(type) ? [type] : [])];
     return html`
       <ha-form
         .hass=${this.hass}
-        .data=${
+        .data=${{
+          ...this._config,
           // TD is Mermaid's alias for TB; the dropdown offers each direction once.
-          this._config.direction === 'TD' ? { ...this._config, direction: 'TB' } : this._config
-        }
+          direction: this._config.direction === 'TD' ? 'TB' : this._config.direction,
+          scale: this._config.scale ?? 100, // the slider shows the default instead of its minimum
+          diagram_type: type,
+        }}
         .schema=${[
           { name: 'title', selector: { text: {} } },
-          { name: 'content', required: true, selector: { template: {} } },
           {
-            name: 'direction',
+            name: 'diagram_type',
             selector: {
               select: {
                 mode: 'dropdown',
-                options: ['TB', 'BT', 'LR', 'RL'].map((value) => ({
+                options: types.map((value) => ({
                   value,
-                  label: localize(this.hass, `editor.direction_options.${value}`),
+                  label: localize(this.hass, `editor.diagram_type_options.${value}`).replace(/^editor\..*/, value),
                 })),
               },
             },
+          },
+          { name: 'content', required: true, selector: { template: {} } },
+          // Mermaid only knows a direction for flowcharts.
+          ...(type === 'flowchart' || !type
+            ? [
+                {
+                  name: 'direction',
+                  selector: {
+                    select: {
+                      mode: 'dropdown',
+                      options: ['TB', 'BT', 'LR', 'RL'].map((value) => ({
+                        value,
+                        label: localize(this.hass, `editor.direction_options.${value}`),
+                      })),
+                    },
+                  },
+                },
+              ]
+            : []),
+          {
+            name: 'scale',
+            selector: { number: { mode: 'slider', min: 30, max: 100, step: 10, unit_of_measurement: '%' } },
           },
         ]}
         .computeLabel=${this._label}

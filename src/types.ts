@@ -24,4 +24,6 @@ export interface MermaidCardConfig {
   entities?: Record<string, string>;
   /** Overrides a flowchart's direction, e.g. TD for a narrow card. */
   direction?: (typeof DIRECTIONS)[number];
+  /** Size in percent of the diagram's natural size; 100 (default) fits it to the card. */
+  scale?: number;
 }

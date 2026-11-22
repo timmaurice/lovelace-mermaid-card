@@ -13,7 +13,7 @@ vi.mock('../src/mermaid', () => ({
   ],
 }));
 
-const { MermaidCard, applyDirection, limitShrinking } = await import('../src/mermaid-card');
+const { MermaidCard, applyDirection, sizeDiagram } = await import('../src/mermaid-card');
 const { MermaidCardEditor } = await import('../src/editor');
 const { localize } = await import('../src/localize');
 
@@ -128,13 +128,32 @@ describe('applyDirection', () => {
   });
 });
 
-describe('limitShrinking', () => {
-  it('keeps the diagram at three quarters of its natural width at least', () => {
+describe('sizeDiagram', () => {
+  const svgOf = (viewBox: string) => {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '-8 -8 800 200');
-    limitShrinking(svg);
-    expect(svg.style.minWidth).toBe('600px');
-    limitShrinking(null); // no SVG, e.g. an empty render: nothing to do
+    svg.setAttribute('viewBox', viewBox);
+    return svg;
+  };
+
+  it('fits to the card down to three quarters of the natural width', () => {
+    const svg = svgOf('-8 -8 800 200');
+    sizeDiagram(svg);
+    expect([svg.style.maxWidth, svg.style.minWidth]).toEqual(['800px', '600px']);
+    sizeDiagram(null); // no SVG, e.g. an empty render: nothing to do
+  });
+
+  it('scales both bounds with the scale option', () => {
+    const svg = svgOf('0 0 800 200');
+    sizeDiagram(svg, 150);
+    expect([svg.style.maxWidth, svg.style.minWidth]).toEqual(['1200px', '900px']);
+    sizeDiagram(svg, 50);
+    expect([svg.style.maxWidth, svg.style.minWidth]).toEqual(['400px', '300px']);
+  });
+
+  it('rejects a scale that is not a positive number', () => {
+    expect(() =>
+      new MermaidCard().setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR', scale: '150%' as never }),
+    ).toThrow(/scale/);
   });
 });
 
@@ -164,6 +183,24 @@ describe('MermaidCardEditor', () => {
     expect(emitted.at(-1)!.entities).toBeUndefined();
   });
 
+  it('rewrites the header when the diagram type changes, without storing the type', () => {
+    const editor = new MermaidCardEditor();
+    const emitted: Record<string, unknown>[] = [];
+    editor.addEventListener('config-changed', (event) => emitted.push((event as CustomEvent).detail.config));
+    editor.setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR\n  A --> B', direction: 'TD', scale: 100 });
+    (editor as unknown as { _formChanged(event: CustomEvent): void })._formChanged(
+      new CustomEvent('value-changed', {
+        detail: {
+          value: { content: 'flowchart LR\n  A --> B', direction: 'TB', scale: 100, diagram_type: 'stateDiagram-v2' },
+        },
+      }),
+    );
+    expect(emitted.at(-1)).toEqual({
+      type: 'custom:mermaid-card',
+      content: 'stateDiagram-v2\n  A --> B',
+    });
+  });
+
   it('offers the diagram nodes once the content was parsed', async () => {
     vi.useFakeTimers();
     const editor = new MermaidCardEditor();
@@ -183,5 +220,23 @@ describe('localize', () => {
     expect(localize({ language: 'fr' }, 'editor.bindings')).toBe('Bound nodes');
     expect(localize({ language: 'de' }, 'editor.direction_options.LR')).toBe('Von links nach rechts');
     expect(localize(undefined, 'editor.nope')).toBe('editor.nope');
+  });
+});
+
+describe('diagram header', async () => {
+  const { diagramType, setDiagramType } = await import('../src/header');
+
+  it('reads the type behind front matter, comments and aliases', () => {
+    expect(diagramType('flowchart LR\n  A --> B')).toBe('flowchart');
+    expect(diagramType('graph TD;\n  A --> B')).toBe('flowchart');
+    expect(diagramType('---\ntitle: x\n---\n%% note\nstateDiagram\n  [*] --> A')).toBe('stateDiagram-v2');
+    expect(diagramType('')).toBeUndefined();
+  });
+
+  it('rewrites only the header line', () => {
+    expect(setDiagramType('flowchart LR\n  A --> B', 'sequenceDiagram')).toBe('sequenceDiagram\n  A --> B');
+    expect(setDiagramType('graph LR\n  A --> B', 'flowchart')).toBe('graph LR\n  A --> B');
+    expect(setDiagramType('---\ntitle: x\n---\npie\n  "a": 1', 'gantt')).toBe('---\ntitle: x\n---\ngantt\n  "a": 1');
+    expect(setDiagramType('', 'flowchart')).toBe('flowchart\n');
   });
 });

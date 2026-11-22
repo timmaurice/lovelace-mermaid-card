@@ -16,13 +16,18 @@ export function applyDirection(text: string, direction?: string): string {
   return direction ? text.replace(FLOWCHART_HEADER, `$1 ${direction}$2`) : text;
 }
 
-// Below this fraction of its natural size a diagram's text gets unreadable; it scrolls instead.
+// Below this fraction of its (scaled) natural size a diagram's text gets unreadable; it scrolls instead.
 const MIN_SCALE = 0.75;
 
-/** Lets Mermaid's SVG shrink to fit the card, but never below MIN_SCALE of its natural width. */
-export function limitShrinking(svg: SVGSVGElement | null): void {
-  const width = Number(svg?.getAttribute('viewBox')?.split(/[\s,]+/)[2]);
-  if (svg && width > 0) svg.style.minWidth = `${Math.round(width * MIN_SCALE)}px`;
+/**
+ * Sizes Mermaid's SVG: at most `scale` percent of its natural width, shrinking to fit the card but
+ * never below MIN_SCALE of that; beyond it the card scrolls sideways.
+ */
+export function sizeDiagram(svg: SVGSVGElement | null, scale = 100): void {
+  const width = (Number(svg?.getAttribute('viewBox')?.split(/[\s,]+/)[2]) * scale) / 100;
+  if (!svg || !(width > 0)) return;
+  svg.style.maxWidth = `${Math.round(width)}px`; // replaces Mermaid's own, which is the natural width
+  svg.style.minWidth = `${Math.round(width * MIN_SCALE)}px`;
 }
 
 type TemplateMessage = { result: string } | { error: string; level?: string };
@@ -55,6 +60,9 @@ export class MermaidCard extends LitElement {
     }
     if (config.direction !== undefined && !DIRECTIONS.includes(config.direction)) {
       throw new Error(`direction must be one of ${DIRECTIONS.join(', ')}`);
+    }
+    if (config.scale !== undefined && !(typeof config.scale === 'number' && config.scale > 0)) {
+      throw new Error('scale must be a positive number, in percent');
     }
     this._unsubscribeTemplate();
     this._config = config;
@@ -135,7 +143,7 @@ export class MermaidCard extends LitElement {
       if (!this._diagram) return;
       this._error = undefined;
       this._diagram.innerHTML = svg;
-      limitShrinking(this._diagram.querySelector('svg'));
+      sizeDiagram(this._diagram.querySelector('svg'), this._config?.scale);
       bindFunctions?.(this._diagram);
       this._bind();
     } catch (error) {

@@ -1,10 +1,13 @@
 {
   "editor": {
     "title": "Title",
+    "diagram_type": "Diagram type",
     "content": "Diagram",
     "content_helper": "Mermaid source. Templates like {{ states(...) }} are rendered live.",
     "direction": "Diagram direction",
     "direction_helper": "Overrides the direction of a flowchart. Top to bottom usually fits narrow cards best.",
+    "scale": "Size",
+    "scale_helper": "100 % fits the diagram to the card; less makes it smaller.",
     "bindings": "Bound nodes",
     "bindings_helper": "Bound nodes are coloured by their entity's state; tapping one opens its details.",
     "node": "Node",
@@ -16,6 +19,18 @@
       "BT": "Bottom to top",
       "LR": "Left to right",
       "RL": "Right to left"
+    },
+    "diagram_type_options": {
+      "flowchart": "Flowchart",
+      "sequenceDiagram": "Sequence diagram",
+      "stateDiagram-v2": "State diagram",
+      "classDiagram": "Class diagram",
+      "erDiagram": "Entity relationship diagram",
+      "gantt": "Gantt chart",
+      "pie": "Pie chart",
+      "mindmap": "Mind map",
+      "timeline": "Timeline",
+      "journey": "User journey"
     }
   }
 }

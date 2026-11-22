@@ -1,10 +1,13 @@
 {
   "editor": {
     "title": "Titel",
+    "diagram_type": "Diagrammtyp",
     "content": "Diagramm",
     "content_helper": "Mermaid-Quelltext. Templates wie {{ states(...) }} werden live gerendert.",
     "direction": "Diagrammrichtung",
     "direction_helper": "Überschreibt die Richtung eines Flowcharts. Von oben nach unten passt meist am besten in schmale Karten.",
+    "scale": "Größe",
+    "scale_helper": "Bei 100 % passt sich das Diagramm an die Karte an, weniger macht es kleiner.",
     "bindings": "Gebundene Knoten",
     "bindings_helper": "Gebundene Knoten werden nach dem Zustand ihrer Entität eingefärbt; Tippen öffnet die Details.",
     "node": "Knoten",
@@ -16,6 +19,18 @@
       "BT": "Von unten nach oben",
       "LR": "Von links nach rechts",
       "RL": "Von rechts nach links"
+    },
+    "diagram_type_options": {
+      "flowchart": "Flussdiagramm",
+      "sequenceDiagram": "Sequenzdiagramm",
+      "stateDiagram-v2": "Zustandsdiagramm",
+      "classDiagram": "Klassendiagramm",
+      "erDiagram": "ER-Diagramm",
+      "gantt": "Gantt-Diagramm",
+      "pie": "Kreisdiagramm",
+      "mindmap": "Mindmap",
+      "timeline": "Zeitstrahl",
+      "journey": "User Journey"
     }
   }
 }
