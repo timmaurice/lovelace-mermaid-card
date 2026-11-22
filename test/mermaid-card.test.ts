@@ -15,7 +15,7 @@ vi.mock('../src/mermaid', () => ({
   }),
 }));
 
-const { MermaidCard, applyDirection, sizeDiagram } = await import('../src/mermaid-card');
+const { MermaidCard, applyDirection, cropDiagram, sizeDiagram } = await import('../src/mermaid-card');
 const { MermaidCardEditor, suggestEntity } = await import('../src/editor');
 const { localize } = await import('../src/localize');
 
@@ -243,6 +243,37 @@ describe('applyDirection', () => {
     expect(() =>
       new MermaidCard().setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR', direction: 'up' as never }),
     ).toThrow(/direction/);
+  });
+});
+
+describe('cropDiagram', () => {
+  const svgOf = (viewBox: string, box: { x: number; y: number; width: number; height: number } | Error) => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', viewBox);
+    svg.getBBox = () => {
+      if (box instanceof Error) throw box;
+      return box as DOMRect;
+    };
+    return svg;
+  };
+
+  it('crops empty space around the drawing, keeping a margin', () => {
+    const svg = svgOf('0 -25 1128 540', { x: 13, y: -7, width: 847, height: 457 }); // a user journey
+    cropDiagram(svg);
+    expect(svg.getAttribute('viewBox')).toBe('5 -15 863 473');
+    const pie = svgOf('0 0 571 450', { x: 39, y: 2, width: 483, height: 409 }); // close to the top edge
+    cropDiagram(pie);
+    expect(pie.getAttribute('viewBox')).toBe('31 0 499 419');
+  });
+
+  it('keeps the box when the drawing reaches past it, or cannot be measured', () => {
+    const gantt = svgOf('0 0 468 184', { x: 0, y: 25, width: 1057, height: 134 });
+    cropDiagram(gantt);
+    expect(gantt.getAttribute('viewBox')).toBe('0 0 468 184');
+    const hidden = svgOf('0 0 100 100', new Error('not shown')); // Firefox, for an SVG that is not shown
+    cropDiagram(hidden);
+    expect(hidden.getAttribute('viewBox')).toBe('0 0 100 100');
+    cropDiagram(null);
   });
 });
 

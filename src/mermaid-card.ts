@@ -36,6 +36,36 @@ export function sizeDiagram(svg: SVGSVGElement | null, scale = 100): void {
   svg.style.minWidth = `${Math.round(width * MIN_SCALE)}px`;
 }
 
+// Room left around the drawing when empty space is cropped from Mermaid's viewBox.
+const CROP_MARGIN = 8;
+
+/**
+ * Crops empty space from Mermaid's viewBox: a journey, timeline, pie or sequence diagram leaves
+ * room around its drawing that only makes the text smaller once the diagram is fitted to the card.
+ * Only when the drawing lies wholly inside the box, so nothing is cut off: a Gantt chart's grid
+ * reaches past it.
+ */
+export function cropDiagram(svg: SVGSVGElement | null): void {
+  const [x, y, width, height] =
+    svg
+      ?.getAttribute('viewBox')
+      ?.split(/[\s,]+/)
+      .map(Number) ?? [];
+  let box: DOMRect | undefined;
+  try {
+    box = svg?.getBBox?.();
+  } catch {
+    return; // Firefox throws for an SVG that is not shown
+  }
+  if (!svg || !box || !(box.width > 0) || ![x, y, width, height].every(Number.isFinite)) return;
+  if (box.x < x || box.y < y || box.x + box.width > x + width || box.y + box.height > y + height) return;
+  // The margin never reaches past Mermaid's own box: a drawing close to its edge keeps that edge.
+  const [left, top] = [Math.max(x, box.x - CROP_MARGIN), Math.max(y, box.y - CROP_MARGIN)];
+  const right = Math.min(x + width, box.x + box.width + CROP_MARGIN);
+  const bottom = Math.min(y + height, box.y + box.height + CROP_MARGIN);
+  svg.setAttribute('viewBox', `${left} ${top} ${right - left} ${bottom - top}`);
+}
+
 // Home Assistant's named colours, with its defaults for themes that do not set them. All dark
 // enough to carry white labels.
 const PALETTE: [string, string][] = [
@@ -208,6 +238,7 @@ export class MermaidCard extends LitElement {
       if (!this._diagram) return;
       this._error = undefined;
       this._diagram.innerHTML = this._svg = svg;
+      cropDiagram(this._diagram.querySelector('svg'));
       sizeDiagram(this._diagram.querySelector('svg'), this._config?.scale);
       bindFunctions?.(this._diagram);
       if (this._dialog?.open) this._fillDialog();
@@ -250,6 +281,8 @@ export class MermaidCard extends LitElement {
     if (!content || !this._svg) return;
     content.innerHTML = this._svg;
     const svg = content.querySelector('svg');
+    const cropped = this._diagram?.querySelector('svg')?.getAttribute('viewBox');
+    if (svg && cropped) svg.setAttribute('viewBox', cropped); // the closed dialog has no layout to crop by
     sizeDiagram(svg, this._config?.scale);
     if (svg) svg.style.minWidth = svg.style.maxWidth;
   }
