@@ -11,17 +11,25 @@ h3 {
   color: var(--secondary-text-color);
   font-size: 0.875rem;
 }
-.row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.bindings ha-expansion-panel {
+  display: block;
   margin-bottom: 8px;
 }
-.row ha-form {
-  flex: 1;
+.bindings ha-form {
+  display: block;
+  padding: 8px 0;
 }
 .stale {
-  margin: -4px 0 8px;
   color: var(--warning-color);
-  font-size: 0.875rem;
+}
+.add {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 16px;
+}
+.add ha-form {
+  align-self: stretch;
+  padding: 0;
 }

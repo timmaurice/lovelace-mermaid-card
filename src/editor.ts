@@ -72,6 +72,8 @@ export class MermaidCardEditor extends LitElement {
   /** Rows as shown, including half-filled ones the config cannot hold yet. */
   @state() private _rows: Binding[] = [];
   @state() private _nodes: DiagramNode[] = [];
+  /** Rows shown unfolded: the ones added here, which still need filling in. */
+  @state() private _open = new Set<number>();
   @state() private _parseError?: string;
   private _nodesFor?: string;
   private _nodesTimer?: ReturnType<typeof setTimeout>;
@@ -207,6 +209,17 @@ export class MermaidCardEditor extends LitElement {
     this._emit(config);
   }
 
+  private _addRow(): void {
+    this._open = new Set([...this._open, this._rows.length]);
+    this._rowsChanged([...this._rows, { node: '', entity: '' }]);
+  }
+
+  private _removeRow(index: number): void {
+    // Rows after the removed one move up a place, their unfolded state with them.
+    this._open = new Set([...this._open].filter((i) => i !== index).map((i) => (i > index ? i - 1 : i)));
+    this._rowsChanged(this._rows.filter((_, i) => i !== index));
+  }
+
   /** Fills in the matching entity when a node is picked for a row that has none yet. */
   private _suggest(old: Binding, row: Binding): Binding {
     // Only on a newly picked node: an entity the user cleared stays cleared.
@@ -305,9 +318,32 @@ export class MermaidCardEditor extends LitElement {
       <div class="bindings">
         <h3>${localize(this.hass, 'editor.bindings')}</h3>
         <p class="helper">${localize(this.hass, 'editor.bindings_helper')}</p>
-        ${this._rows.map(
-          (row, index) => html`
-            <div class="row">
+        ${this._rows.map((row, index) => {
+          const stateObj = row.entity ? this.hass!.states[row.entity] : undefined;
+          const stale = known && row.node && !known.has(row.node);
+          return html`
+            <ha-expansion-panel
+              outlined
+              .expanded=${this._open.has(index)}
+              .header=${row.node || localize(this.hass, 'editor.new_binding')}
+            >
+              ${
+                stateObj
+                  ? html`<ha-state-icon slot="leading-icon" .hass=${this.hass} .stateObj=${stateObj}></ha-state-icon>`
+                  : nothing
+              }
+              <span slot="secondary" class=${stale ? 'stale' : ''}>
+                ${stale ? localize(this.hass, 'editor.stale_binding') : (stateObj?.attributes.friendly_name ?? row.entity)}
+              </span>
+              <ha-icon-button
+                slot="icons"
+                .label=${localize(this.hass, 'editor.remove_binding')}
+                .path=${MDI_DELETE}
+                @click=${(event: Event) => {
+                  event.stopPropagation(); // the header around it would fold the panel
+                  this._removeRow(index);
+                }}
+              ></ha-icon-button>
               <ha-form
                 .hass=${this.hass}
                 .data=${row}
@@ -324,8 +360,8 @@ export class MermaidCardEditor extends LitElement {
                             custom_value: true,
                             // Each node once: a second binding would only overwrite the first.
                             options: this._nodes
-                              .filter((node) => node.id === row.node || !used.has(node.id))
-                              .map((node) => ({ value: node.id, label: node.label })),
+                              .filter((candidate) => candidate.id === row.node || !used.has(candidate.id))
+                              .map((candidate) => ({ value: candidate.id, label: candidate.label })),
                           },
                         },
                       },
@@ -336,15 +372,8 @@ export class MermaidCardEditor extends LitElement {
                   ...(edges.has(row.node)
                     ? []
                     : [
-                        {
-                          type: 'expandable',
-                          name: 'actions',
-                          flatten: true,
-                          schema: [
-                            { name: 'tap_action', selector: { ui_action: { default_action: 'more-info' } } },
-                            { name: 'hold_action', selector: { ui_action: { default_action: 'none' } } },
-                          ],
-                        },
+                        { name: 'tap_action', selector: { ui_action: { default_action: 'more-info' } } },
+                        { name: 'hold_action', selector: { ui_action: { default_action: 'none' } } },
                       ]),
                 ]}
                 .computeLabel=${this._rowLabel}
@@ -355,34 +384,24 @@ export class MermaidCardEditor extends LitElement {
                     ),
                   )}
               ></ha-form>
-              <ha-icon-button
-                .label=${localize(this.hass, 'editor.remove_binding')}
-                .path=${MDI_DELETE}
-                @click=${() => this._rowsChanged(this._rows.filter((_, i) => i !== index))}
-              ></ha-icon-button>
-            </div>
-            ${
-              known && row.node && !known.has(row.node)
-                ? html`<p class="stale">${localize(this.hass, 'editor.stale_binding')}</p>`
-                : nothing
-            }
-          `,
-        )}
-        <ha-button @click=${() => this._rowsChanged([...this._rows, { node: '', entity: '' }])}>
-          ${localize(this.hass, 'editor.add_binding')}
-        </ha-button>
-        ${
-          type === 'flowchart'
-            ? html`<ha-form
-                .hass=${this.hass}
-                .data=${{}}
-                .schema=${[{ name: 'add_node', selector: { entity: {} } }]}
-                .computeLabel=${this._label}
-                @value-changed=${(event: CustomEvent<{ value: { add_node?: string } }>) =>
-                  this._addNode(event.detail.value.add_node)}
-              ></ha-form>`
-            : nothing
-        }
+            </ha-expansion-panel>
+          `;
+        })}
+        <div class="add">
+          <ha-button @click=${this._addRow}>${localize(this.hass, 'editor.add_binding')}</ha-button>
+          ${
+            type === 'flowchart'
+              ? html`<ha-form
+                  .hass=${this.hass}
+                  .data=${{}}
+                  .schema=${[{ name: 'add_node', selector: { entity: {} } }]}
+                  .computeLabel=${this._label}
+                  @value-changed=${(event: CustomEvent<{ value: { add_node?: string } }>) =>
+                    this._addNode(event.detail.value.add_node)}
+                ></ha-form>`
+              : nothing
+          }
+        </div>
       </div>
     `;
   }

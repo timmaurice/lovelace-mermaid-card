@@ -324,6 +324,26 @@ describe('MermaidCardEditor', () => {
   const internals = (editor: InstanceType<typeof MermaidCardEditor>) =>
     editor as unknown as { _rows: Rows; _nodes: unknown[]; _rowsChanged(rows: Rows): void };
 
+  it('unfolds a row added here and keeps the others folded, also after a removal', async () => {
+    const editor = new MermaidCardEditor();
+    editor.hass = makeHass({});
+    editor.setConfig({ type: 'custom:mermaid-card', content: 'A --> B', entities: { A: 'light.a', B: 'light.b' } });
+    document.body.append(editor);
+    const internals = editor as unknown as { _addRow(): void; _removeRow(index: number): void };
+    const expanded = async () => {
+      await editor.updateComplete;
+      return [...editor.shadowRoot!.querySelectorAll('ha-expansion-panel')].map(
+        (panel) => (panel as unknown as { expanded: boolean }).expanded,
+      );
+    };
+    expect(await expanded()).toEqual([false, false]);
+    internals._addRow();
+    expect(await expanded()).toEqual([false, false, true]);
+    internals._removeRow(0);
+    expect(await expanded()).toEqual([false, true]);
+    editor.remove();
+  });
+
   it('offers actions for a bound node, not for a bound edge', async () => {
     const editor = new MermaidCardEditor();
     editor.hass = makeHass({});
@@ -338,10 +358,10 @@ describe('MermaidCardEditor', () => {
     ];
     document.body.append(editor);
     await editor.updateComplete;
-    const schemas = [...editor.shadowRoot!.querySelectorAll('.row ha-form')].map((form) =>
+    const schemas = [...editor.shadowRoot!.querySelectorAll('ha-expansion-panel ha-form')].map((form) =>
       (form as unknown as { schema: { name: string }[] }).schema.map((item) => item.name),
     );
-    expect(schemas).toEqual([['', 'actions'], ['']]);
+    expect(schemas).toEqual([['', 'tap_action', 'hold_action'], ['']]);
     editor.remove();
   });
 
@@ -523,14 +543,18 @@ describe('MermaidCardEditor bindings', () => {
     editor.setConfig({ type: 'custom:mermaid-card', content: 'A --> B', entities: { A: 'light.a', Gone: 'light.b' } });
     document.body.append(editor);
     await editor.updateComplete;
-    const warnings = () => [...editor.shadowRoot!.querySelectorAll('.stale')].map((p) => p.textContent);
+    const warnings = () => [...editor.shadowRoot!.querySelectorAll('.stale')].map((p) => p.textContent?.trim());
 
     expect(warnings()).toEqual([]); // no ids yet: nothing can be judged
 
     internals._nodes = [{ id: 'A', label: 'A' }];
     await editor.updateComplete;
     expect(warnings()).toEqual(['This node is not in the diagram.']);
-    expect(editor.shadowRoot!.querySelectorAll('.row')[1].nextElementSibling?.className).toBe('stale');
+    const panels = editor.shadowRoot!.querySelectorAll('ha-expansion-panel');
+    expect([panels[0].querySelector('.stale'), panels[1].querySelector('.stale')?.textContent?.trim()]).toEqual([
+      null,
+      'This node is not in the diagram.',
+    ]);
     editor.remove();
   });
 });

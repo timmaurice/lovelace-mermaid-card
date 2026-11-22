@@ -76,7 +76,7 @@ test('the editor lists the diagram nodes for binding', async ({ page }) => {
   await expect(editor).toBeVisible({ timeout: 30_000 });
 
   // One row per binding in the config, and both diagram nodes and their edge on offer.
-  await expect(editor.locator('.row')).toHaveCount(2);
+  await expect(editor.locator('ha-expansion-panel')).toHaveCount(2);
   await expect
     .poll(() =>
       editor.evaluate((element) => (element as unknown as { _nodes: { id: string }[] })._nodes.map((node) => node.id)),
