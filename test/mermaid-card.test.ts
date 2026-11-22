@@ -198,7 +198,7 @@ describe('bindNodes', () => {
     expect(edge.style.strokeDashoffset).toBe('0');
   });
 
-  it('maps a value to a duration on a log scale, from slow near zero to fast at max', () => {
+  it('maps a value to a duration by its square root, from slow near zero to fast at max', () => {
     expect(edgeDuration(0)).toBe(50);
     expect(edgeDuration(10000)).toBe(5);
     expect(edgeDuration(50000)).toBe(5); // past max stays at full speed
