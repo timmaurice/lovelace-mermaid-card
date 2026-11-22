@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { bindNodes, isActive, stateColor } from '../src/entities';
-import { TEMPLATE, type HassEntity, type HomeAssistant } from '../src/types';
+import { TEMPLATE, type HassEntity, type HomeAssistant, type MermaidCardConfig } from '../src/types';
 
 const render = vi.fn(async () => ({
   svg: '<svg><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g><g class="node" id="mermaid-card-1-flowchart-B-0"><rect></rect></g></svg>',
@@ -16,7 +16,7 @@ vi.mock('../src/mermaid', () => ({
 }));
 
 const { MermaidCard, applyDirection, sizeDiagram } = await import('../src/mermaid-card');
-const { MermaidCardEditor } = await import('../src/editor');
+const { MermaidCardEditor, suggestEntity } = await import('../src/editor');
 const { localize } = await import('../src/localize');
 
 const entity = (entity_id: string, state: string): HassEntity => ({ entity_id, state, attributes: {} });
@@ -409,5 +409,154 @@ describe('diagram header', async () => {
     expect(withHeader('  A->>B: hi', 'sequenceDiagram', 'TB')).toBe('sequenceDiagram\n  A->>B: hi');
     expect(withHeader('---\ntitle: x\n---\n  "a": 1', 'pie')).toBe('---\ntitle: x\n---\npie\n  "a": 1');
     expect(withHeader('graph LR\n  A --> B', 'pie')).toBe('graph LR\n  A --> B');
+  });
+});
+
+describe('getCardSize', () => {
+  it('is 4 before the first render, then the diagram height in 50 px units plus the header', async () => {
+    const card = new MermaidCard();
+    card.setConfig({ type: 'custom:mermaid-card', content: 'flowchart LR\n A --> B', title: 'Heating' });
+    expect(card.getCardSize()).toBe(4);
+
+    card.hass = makeHass({});
+    document.body.append(card);
+    await vi.waitFor(() => expect(card.shadowRoot!.querySelector('svg')).not.toBeNull());
+    // jsdom has no layout.
+    card.shadowRoot!.querySelector('svg')!.getBoundingClientRect = () => ({ height: 120 }) as DOMRect;
+    expect(card.getCardSize()).toBe(3 + 1);
+    card.remove();
+  });
+});
+
+describe('MermaidCardEditor bindings', () => {
+  it('warns about a binding whose node is gone, once the diagram ids are known', async () => {
+    const editor = new MermaidCardEditor();
+    const internals = editor as unknown as { _nodes: { id: string; label: string }[] };
+    editor.hass = makeHass({});
+    editor.setConfig({ type: 'custom:mermaid-card', content: 'A --> B', entities: { A: 'light.a', Gone: 'light.b' } });
+    document.body.append(editor);
+    await editor.updateComplete;
+    const warnings = () => [...editor.shadowRoot!.querySelectorAll('.stale')].map((p) => p.textContent);
+
+    expect(warnings()).toEqual([]); // no ids yet: nothing can be judged
+
+    internals._nodes = [{ id: 'A', label: 'A' }];
+    await editor.updateComplete;
+    expect(warnings()).toEqual(['This node is not in the diagram.']);
+    expect(editor.shadowRoot!.querySelectorAll('.row')[1].nextElementSibling?.className).toBe('stale');
+    editor.remove();
+  });
+});
+
+const named = (entity_id: string, friendly_name?: string): HassEntity => ({
+  entity_id,
+  state: 'on',
+  attributes: { friendly_name },
+});
+const states = (...entities: HassEntity[]) => Object.fromEntries(entities.map((e) => [e.entity_id, e]));
+
+describe('suggestEntity', () => {
+  it('matches the friendly name to the node text, trimmed and ignoring case', () => {
+    expect(suggestEntity('A', ' heat PUMP ', states(named('switch.x', 'Heat pump'), named('light.y', 'Lamp')))).toBe(
+      'switch.x',
+    );
+  });
+
+  it('falls back to the object id matching the lowercased node id', () => {
+    expect(suggestEntity('Boiler', 'Something', states(named('switch.boiler'), named('light.boiler_2')))).toBe(
+      'switch.boiler',
+    );
+    expect(suggestEntity('Boiler', undefined, states(named('switch.boiler')))).toBe('switch.boiler');
+  });
+
+  it('suggests nothing when several entities match, or none', () => {
+    expect(suggestEntity('A', 'Lamp', states(named('light.a', 'Lamp'), named('light.b', 'Lamp')))).toBe('');
+    expect(suggestEntity('pump', '', states(named('switch.pump'), named('sensor.pump')))).toBe('');
+    expect(suggestEntity('X', 'Nothing', states(named('light.a', 'Lamp')))).toBe('');
+  });
+});
+
+describe('MermaidCardEditor entity suggestion', () => {
+  type Binding = { node: string; entity: string };
+  const make = () => {
+    const editor = new MermaidCardEditor();
+    editor.hass = { states: states(named('switch.pump', 'Heat pump')) } as unknown as HomeAssistant;
+    const internals = editor as unknown as {
+      _nodes: { id: string; label: string; text: string }[];
+      _suggest(old: Binding, row: Binding): Binding;
+    };
+    internals._nodes = [{ id: 'A', label: 'A – Heat pump', text: 'Heat pump' }];
+    return internals;
+  };
+
+  it('fills in the entity when a node is picked for an empty row', () => {
+    expect(make()._suggest({ node: '', entity: '' }, { node: 'A', entity: '' })).toEqual({
+      node: 'A',
+      entity: 'switch.pump',
+    });
+  });
+
+  it('never overwrites an entity, nor refills one the user cleared', () => {
+    const editor = make();
+    expect(editor._suggest({ node: '', entity: 'light.x' }, { node: 'A', entity: 'light.x' }).entity).toBe('light.x');
+    expect(editor._suggest({ node: 'A', entity: 'switch.pump' }, { node: 'A', entity: '' }).entity).toBe('');
+  });
+});
+
+type Internals = { _nodes: { id: string; label: string }[]; _addNode(entityId: string): void };
+
+function setup(content: string, entities?: Record<string, string>) {
+  const editor = new MermaidCardEditor();
+  editor.hass = {
+    states: {
+      'sensor.outdoor_temp': {
+        entity_id: 'sensor.outdoor_temp',
+        state: '4',
+        attributes: { friendly_name: 'Outdoor "north"' },
+      },
+      'switch.end': { entity_id: 'switch.end', state: 'on', attributes: { friendly_name: 'Pump {{ 1 }}' } },
+    },
+  } as unknown as HomeAssistant;
+  const emitted: MermaidCardConfig[] = [];
+  editor.addEventListener('config-changed', (event) => emitted.push((event as CustomEvent).detail.config));
+  editor.setConfig({ type: 'custom:mermaid-card', content, entities });
+  return { internals: editor as unknown as Internals, emitted };
+}
+
+describe('MermaidCardEditor: add an entity as a node', () => {
+  it('appends a node line and its binding in one change', () => {
+    const { internals, emitted } = setup('  A --> B', { A: 'light.a' });
+    internals._addNode('sensor.outdoor_temp');
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0].content).toBe(
+      `  A --> B\n  outdoor_temp["Outdoor #quot;north#quot;<br>{{ states('sensor.outdoor_temp', with_unit=True) }}"]`,
+    );
+    expect(emitted[0].entities).toEqual({ A: 'light.a', outdoor_temp: 'sensor.outdoor_temp' });
+  });
+
+  it('works on empty content and falls back to the entity id as name', () => {
+    const { internals, emitted } = setup('');
+    internals._addNode('light.unknown');
+    expect(emitted[0].content).toBe(`  unknown["light.unknown<br>{{ states('light.unknown', with_unit=True) }}"]`);
+  });
+
+  it('does not add a blank line after content ending with a newline', () => {
+    const { internals, emitted } = setup('  A --> B\n');
+    internals._addNode('light.x');
+    expect(emitted[0].content).toMatch(/^ {2}A --> B\n {2}x\["/);
+  });
+
+  it('makes the id unique against diagram nodes and bindings', () => {
+    const { internals, emitted } = setup('  outdoor_temp --> B', { outdoor_temp_2: 'light.a' });
+    internals._nodes = [{ id: 'outdoor_temp', label: 'outdoor_temp' }];
+    internals._addNode('sensor.outdoor_temp');
+    expect(emitted[0].entities).toMatchObject({ outdoor_temp_3: 'sensor.outdoor_temp' });
+    expect(emitted[0].content).toContain('\n  outdoor_temp_3["');
+  });
+
+  it('avoids the reserved id end and keeps template braces out of the name', () => {
+    const { internals, emitted } = setup('');
+    internals._addNode('switch.end');
+    expect(emitted[0].content).toBe(`  end_2["Pump #123;#123; 1 }}<br>{{ states('switch.end', with_unit=True) }}"]`);
   });
 });
