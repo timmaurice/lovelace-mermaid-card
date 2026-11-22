@@ -30,6 +30,13 @@ export function applyDirection(text: string, direction?: string): string {
   return direction ? text.replace(FLOWCHART_HEADER, `$1 ${direction}$2`) : text;
 }
 
+/** An SVG's viewBox as x, y, width and height; empty without one. */
+const viewBox = (svg: SVGSVGElement | null | undefined): number[] =>
+  svg
+    ?.getAttribute('viewBox')
+    ?.split(/[\s,]+/)
+    .map(Number) ?? [];
+
 // Below this fraction of its (scaled) natural size a diagram's text gets unreadable; it scrolls instead.
 const MIN_SCALE = 0.75;
 
@@ -38,7 +45,7 @@ const MIN_SCALE = 0.75;
  * never below MIN_SCALE of that; beyond it the card scrolls sideways.
  */
 export function sizeDiagram(svg: SVGSVGElement | null, scale = 100): void {
-  const width = (Number(svg?.getAttribute('viewBox')?.split(/[\s,]+/)[2]) * scale) / 100;
+  const width = (viewBox(svg)[2] * scale) / 100;
   if (!svg || !(width > 0)) return;
   svg.style.maxWidth = `${Math.round(width)}px`; // replaces Mermaid's own, which is the natural width
   svg.style.minWidth = `${Math.round(width * MIN_SCALE)}px`;
@@ -54,11 +61,7 @@ const CROP_MARGIN = 8;
  * reaches past it.
  */
 export function cropDiagram(svg: SVGSVGElement | null): void {
-  const [x, y, width, height] =
-    svg
-      ?.getAttribute('viewBox')
-      ?.split(/[\s,]+/)
-      .map(Number) ?? [];
+  const [x, y, width, height] = viewBox(svg);
   let box: DOMRect | undefined;
   try {
     box = svg?.getBBox?.();
@@ -349,11 +352,7 @@ export class MermaidCard extends LitElement {
     const cropped = this._diagram?.querySelector('svg')?.getAttribute('viewBox');
     if (svg && cropped) svg.setAttribute('viewBox', cropped); // the closed dialog has no layout to crop by
     sizeDiagram(svg, this._config?.scale);
-    const [, , width, height] =
-      svg
-        ?.getAttribute('viewBox')
-        ?.split(/[\s,]+/)
-        .map(Number) ?? [];
+    const [, , width, height] = viewBox(svg);
     const natural = parseFloat(svg?.style.maxWidth ?? '');
     this._zoom ??= attachZoom(content, this._dialog);
     if (!svg || !(natural > 0)) return;
