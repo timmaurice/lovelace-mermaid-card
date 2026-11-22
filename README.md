@@ -30,7 +30,7 @@ A Home Assistant Lovelace card that renders [Mermaid](https://mermaid.js.org/) d
 
 ### AI friendly
 
-Any Mermaid an assistant writes can go straight into `content` (or into a sensor attribute the template reads).
+Any Mermaid an assistant writes can go straight into `content` (or into a sensor attribute the template reads). Point your assistant at [`llms.txt`](llms.txt): the config, how bindings behave, template patterns, the traps, and a tested example for every diagram type.
 
 ## Localization
 

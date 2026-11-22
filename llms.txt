@@ -1,0 +1,356 @@
+# Mermaid Card
+
+> A Home Assistant Lovelace card (`custom:mermaid-card`) that renders Mermaid diagrams. The diagram source is a Home Assistant template, so states, attributes, areas and floors can go into labels, branches, styles or the whole diagram; nodes and edges can be bound to entities. This file is for AI assistants writing such cards: what the card does with a config, the patterns that work, the traps, and tested examples.
+
+Repository: https://github.com/timmaurice/lovelace-mermaid-card · Mermaid syntax: https://mermaid.js.org/intro/
+
+## Config
+
+```yaml
+type: custom:mermaid-card
+title: Heating            # optional card header
+diagram_type: flowchart   # optional; used when content has no header line of its own
+direction: LR             # optional; flowcharts only: TB (default), BT, LR, RL
+scale: 100                # optional; percent of the natural size, 100 fits the card
+content: |                # required; Mermaid source, may contain templates
+  A[Heat pump] flow@--> B["Boiler<br>{{ states('sensor.boiler_temperature') }} °C"]
+entities:                 # optional; node or edge id -> entity
+  B: sensor.boiler_temperature
+  flow: switch.heat_pump
+  A:
+    entity: switch.heat_pump
+    tap_action: { action: toggle }
+    hold_action: { action: more-info }
+```
+
+- `diagram_type` takes any Mermaid header keyword: `flowchart`, `sequenceDiagram`, `stateDiagram-v2`, `classDiagram`, `erDiagram`, `gantt`, `pie`, `mindmap`, `timeline`, `journey`, `sankey-beta`, `xychart-beta`, `kanban`, `quadrantChart`, `gitGraph`, `block-beta`, …
+- Instead of `diagram_type`, `content` may start with its own header line (`flowchart LR`, `pie showData`). A header in the content wins. A header with extras (`pie showData`, `xychart-beta horizontal`) must be in the content: `diagram_type` holds only the keyword.
+- Mermaid front matter (`---` / `config:` / `---`) may come first in `content`, before the header. Use it for per-diagram settings, e.g. `sankey: { showValues: true, linkColor: source }` or `xyChart: { width: 340, height: 320 }`.
+
+## How a config becomes a diagram
+
+1. If `content` contains `{{`, `{%` or a closed `{# … #}`, Home Assistant renders it as a template (websocket `render_template`, live). It re-renders when an entity the template reads changes, and every minute when it uses `now()`.
+2. The rendered text gets a header from `diagram_type`/`direction` unless it has its own.
+3. Mermaid draws it in strict security mode: no `click` callbacks or links, HTML in labels is sanitised.
+4. The SVG is themed from the Home Assistant theme (light and dark), fitted to the card (shrinks to 75 %, then scrolls sideways; a button opens it full size).
+5. Bindings in `entities` are applied to the drawn SVG, and again on every state change without redrawing.
+
+## Bindings (`entities`)
+
+- **Nodes** of flowcharts, state diagrams and class diagrams. The key is the node id (`HP` in `HP[Heat pump]`, the state name in a state diagram, the class name).
+- **Edges** of flowcharts. Name an edge with Mermaid's `@` syntax, `A e1@--> B`, and bind `e1`. Unnamed edges have ids like `L_A_B_0` (`L_<from>_<to>_<n>`).
+- A value is an entity id, or a mapping with `entity`, `tap_action`, `hold_action` (Home Assistant's [action format](https://www.home-assistant.io/dashboards/actions/): `more-info`, `toggle`, `navigate`, `perform-action`, `url`, `none`).
+- Node colour follows the entity's state: active (`on`, `open`, `heat`, `home`, any other text) gets the domain's active colour, inactive (`off`, `closed`, `idle`, `standby`, `not_home`, `locked`, `paused`, `docked`, `disarmed`) the inactive colour, `unavailable`/`unknown` the unavailable colour. Numeric states leave the node uncoloured: put values in the label instead.
+- Tap opens more-info unless `tap_action` says otherwise; a long press runs `hold_action` only when it is set. Edges take no actions.
+- A bound edge moves while its entity is active: on, open, heating, or a number other than zero. It takes the entity's colour, arrowhead included. How it moves comes from the diagram: `e1@{ animation: slow }` (or `fast`), or a `classDef` with its own `animation` applied with `class e1 …`; with none, it moves fast. "Reduce motion" stops all of it.
+- The binding colours every node bound to an entity. To mark one state of many (the current robot state, the branch taken), use a template that writes `class <id> <classDef>` instead.
+
+## Template patterns
+
+- Value in a label: `T["Living room<br>{{ states('sensor.t', with_unit=True) }}"]`. Quote labels that contain anything but words: `["…"]`.
+- State in words, translated: `{{ state_translated('sun.sun') }}`. Attributes: `{{ state_attr('climate.x', 'current_temperature') }}`.
+- Choose a branch or a highlight: `{{ 'yes' if is_state('sun.sun', 'below_horizon') else 'no' }}@{ animation: slow }` and `class {{ 'A' if … else 'B' }} taken` with `classDef taken stroke-width:4px`.
+- Build the diagram from the registry: `floors()`, `floor_name(f)`, `floor_areas(f)`, `areas()`, `area_name(a)`, `area_entities(a)`, `label_entities('x')`, `expand(...)`, `device_id(entity)`.
+- Loop over states: `{% for e in states.input_boolean | selectattr('state', 'eq', 'on') %}…{% endfor %}`, `states | groupby('domain')`, `e.name`, `e.object_id`, `e.last_changed`, `e.attributes`.
+- Times: `as_local(as_datetime(state_attr('sun.sun', 'next_setting'))).strftime('%H:%M')`, `relative_time(e.last_changed)`, `now()`. Put a repeated expression in a macro: `{% macro t(a) %}…{% endmacro %}`.
+- Collect and sort: `{% set ns = namespace(items=[]) %}{% set ns.items = ns.items + [(key, label)] %}` then `ns.items | sort(attribute='0')`.
+- Use `{%-` / `-%}` to keep template tags from leaving blank lines.
+
+## Traps
+
+- **Home Assistant trims the rendered template**, so the first line loses its indentation. Where indentation is structure (mind map, kanban), write the top level at the start of the line and indent the rest relative to it.
+- **Hexagons collide with templates:** `A{{text}}` is read as a template. Write `A{{ '{{' }}text{{ '}}' }}` or wrap the diagram in `{% raw %}…{% endraw %}`.
+- **Colons separate fields** in Gantt tasks (`name :start, end`), timeline periods (`period : event`) and journey tasks (`task: score: actors`). Keep them out of names and periods: `| replace(':', ' ')`, or `strftime('%H.%M')` in a timeline period.
+- **Parentheses and brackets are shapes:** a friendly name like `Lamp (hall)` in an unquoted node or mind map line starts a shape. Quote it in `["…"]` or `| replace('(', '')`.
+- **Gantt `todayMarker`** uses the browser's clock and time zone; a `now()` milestone uses Home Assistant's. Use one, not both, when they can differ: `todayMarker off`.
+- **Pie labels are quoted:** `"{{ domain }}" : {{ count }}`. `showData` goes on the header line: `pie showData` in the content, not `diagram_type`.
+- **Wide diagram types** (sequence, pie with legend, sankey, timeline, journey, Gantt) need room: give them a wide card (two columns in a sections view) or `direction: TB` for flowcharts.
+- Template errors show in the card as an alert; Mermaid parse errors too, and the visual editor shows them at the diagram field with the line number.
+
+## Examples
+
+Every example below renders as shown (tested against Home Assistant 2026.11 with Mermaid 12). Those on `sun.sun`, `zone.home`, `person`, `states` and the area and floor registry work in any installation. The others use demo helpers (`input_boolean.*`, `input_number.solar_power`, `input_number.*_temperature`, `input_select.robot_vacuum`): swap in your own entities.
+
+### Flowchart
+```yaml
+type: custom:mermaid-card
+title: Flowchart
+content: |
+  {%- set dark = is_state('sun.sun', 'below_horizon') %}
+    SUN(["Sun<br>{{ state_translated('sun.sun') }}, {{ state_attr('sun.sun', 'elevation') | round(0) }}°"]) --> DARK{Dark outside?}
+    DARK yes@-->|yes| SCENE["Evening scene<br>{{ state_translated('input_boolean.evening_scene') }}"]
+    DARK no@-->|no| NOTHING[Nothing to do]
+    {{ 'yes' if dark else 'no' }}@{ animation: slow }
+    classDef taken stroke-width:4px
+    class {{ 'SCENE' if dark else 'NOTHING' }} taken
+entities:
+  SCENE:
+    entity: input_boolean.evening_scene
+    tap_action:
+      action: toggle
+    hold_action:
+      action: more-info
+```
+
+### Live flow
+```yaml
+type: custom:mermaid-card
+title: Live flow
+content: |
+  HP["Heat pump<br>{{ states('input_boolean.heat_pump') }}"] power@--> BOIL[("Boiler")]
+  BOIL circuit@--> FLOOR["Underfloor heating<br>{{ states('input_boolean.underfloor_heating') }}"]
+  power@{ animation: fast }
+  circuit@{ animation: slow }
+entities:
+  HP:
+    entity: input_boolean.heat_pump
+    tap_action:
+      action: toggle
+    hold_action:
+      action: more-info
+  power: input_boolean.heat_pump
+  circuit: input_boolean.underfloor_heating
+  FLOOR:
+    entity: input_boolean.underfloor_heating
+    tap_action:
+      action: toggle
+    hold_action:
+      action: more-info
+```
+
+### State diagram
+```yaml
+type: custom:mermaid-card
+title: State diagram
+diagram_type: stateDiagram-v2
+content: |
+  [*] --> Docked
+  Docked --> Cleaning: start
+  Cleaning --> Returning: done
+  Returning --> Docked
+  Cleaning --> Error: stuck
+  Error --> Docked: reset
+  note right of {{ states('input_select.robot_vacuum') }}: now, since {{ relative_time(states.input_select.robot_vacuum.last_changed) }}
+  classDef current stroke-width:4px,font-weight:bold
+  class {{ states('input_select.robot_vacuum') }} current
+```
+
+### Energy flow
+```yaml
+type: custom:mermaid-card
+title: Energy flow
+diagram_type: sankey-beta
+content: |
+  ---
+  config:
+    sankey:
+      showValues: true
+      linkColor: source
+  ---
+  {% set solar = states('input_number.solar_power') | float(0) %}{% set home = states('input_number.home_consumption') | float(0) %}{% set pump = 900 if is_state('input_boolean.heat_pump', 'on') else 0 %}{% set wash = 500 if is_state('input_boolean.washer', 'on') else 0 %}
+  {%- for source, target, value in [
+    ('Solar', 'Home', [solar, home] | min),
+    ('Solar', 'Grid export', [solar - home, 0] | max),
+    ('Grid import', 'Home', [home - solar, 0] | max),
+    ('Home', 'Heat pump', [pump, home] | min),
+    ('Home', 'Washer', [wash, [home - pump, 0] | max] | min),
+    ('Home', 'Everything else', [home - pump - wash, 0] | max),
+  ] if value > 0 %}
+  {{ source }},{{ target }},{{ value | round(0) }}
+  {%- endfor %}
+```
+
+### Room temperatures
+```yaml
+type: custom:mermaid-card
+title: Room temperatures
+diagram_type: xychart-beta
+content: |
+  ---
+  config:
+    xyChart:
+      width: 340
+      height: 320
+  ---
+  {% set rooms = ['outdoor', 'living_room', 'kitchen', 'bedroom'] %}
+    title "vs. 21 °C"
+    x-axis [{% for r in rooms %}"{{ state_attr('input_number.' ~ r ~ '_temperature', 'friendly_name') | replace(' temperature', '') }}"{{ ', ' if not loop.last }}{% endfor %}]
+    y-axis "°C" -10 --> 30
+    bar [{% for r in rooms %}{{ states('input_number.' ~ r ~ '_temperature') | float(0) }}{{ ', ' if not loop.last }}{% endfor %}]
+    line [21, 21, 21, 21]
+```
+
+### Pie chart
+```yaml
+type: custom:mermaid-card
+title: Pie chart
+content: |
+  pie showData
+    title Entities by domain
+  {%- set ns = namespace(rows=[]) %}
+  {%- for domain, items in states | groupby('domain') %}{% set ns.rows = ns.rows + [(items | count, domain)] %}{% endfor %}
+  {%- set rows = ns.rows | sort(reverse=true) %}
+  {%- for count, domain in rows[:6] %}
+    "{{ domain }}" : {{ count }}
+  {%- endfor %}
+  {%- if rows | count > 6 %}
+    "other" : {{ rows[6:] | map(attribute='0') | sum }}
+  {%- endif %}
+```
+
+### Kanban
+```yaml
+type: custom:mermaid-card
+title: Kanban
+diagram_type: kanban
+content: |
+  {%- for column, state in [('On', 'on'), ('Off', 'off')] %}
+  {{ state }}_column[{{ column }}]
+  {%- for e in states.input_boolean | selectattr('state', 'eq', state) %}
+    {{ e.object_id }}[{{ e.name }}]{% if area_name(e.entity_id) %}@{ assigned: '{{ area_name(e.entity_id) }}' }{% endif %}
+  {%- endfor %}
+  {%- endfor %}
+```
+
+### Sequence diagram
+```yaml
+type: custom:mermaid-card
+title: Sequence diagram
+diagram_type: sequenceDiagram
+content: |
+  {%- macro t(a, f='%H:%M') %}{{ as_local(as_datetime(state_attr('sun.sun', a))).strftime(f) }}{% endmacro %}
+  {%- set dark = is_state('sun.sun', 'below_horizon') %}
+    autonumber
+    participant Sun
+    participant HA as Home Assistant
+    participant Scene as Evening scene
+    Sun->>HA: sets at {{ t('next_setting') }}, rises at {{ t('next_rising') }}
+    Note over Sun,HA: elevation now {{ state_attr('sun.sun', 'elevation') | round(1) }}°
+    alt {{ 'it is dark' if dark else 'still daylight' }}
+      HA->>Scene: {{ 'turn on' if dark else 'wait until sunset' }}
+      Scene-->>HA: {{ state_translated('input_boolean.evening_scene') }}
+    end
+    HA->>HA: {{ states.input_boolean | selectattr('state', 'eq', 'on') | list | count }} helpers on
+```
+
+### Mind map
+```yaml
+type: custom:mermaid-card
+title: Mind map
+diagram_type: mindmap
+content: |
+  root(({{ state_attr('zone.home', 'friendly_name') or 'Home' }}))
+  {%- for f in floors() %}
+    {{ floor_name(f) }}
+  {%- for a in floor_areas(f) %}
+  {%- set temperature = area_entities(a) | select('match', 'input_number[.].*temperature') | first %}
+      {{ area_name(a) }}{{ ' · ' ~ states(temperature, with_unit=True) if temperature }}
+  {%- endfor %}
+  {%- endfor %}
+```
+
+### Class diagram
+```yaml
+type: custom:mermaid-card
+title: Class diagram
+diagram_type: classDiagram
+content: |
+  {%- for e in [states.sun.sun, states.zone.home, states.person | first] if e %}
+    class {{ e.entity_id | replace('.', '_') }}["{{ e.name }}"] {
+      +state {{ e.state }}
+    {%- for k, v in e.attributes.items() if k not in ['friendly_name', 'icon', 'entity_picture', 'editable', 'id', 'user_id', 'device_trackers', 'passive', 'persons', 'radius'] and (v is number or v is string) %}
+    {%- if loop.index <= 5 %}
+      +{{ k }} {{ as_local(as_datetime(v)).strftime('%H:%M') if v is string and v is match('[0-9]{4}-[0-9]{2}-[0-9]{2}T') else v }}
+    {%- endif %}
+    {%- endfor %}
+    }
+  {%- endfor %}
+    zone_home "1" --> "*" {{ (states.person | first).entity_id | replace('.', '_') }} : is home
+    sun_sun ..> zone_home : shines on
+```
+
+### Entity relationship
+```yaml
+type: custom:mermaid-card
+title: Entity relationship
+diagram_type: erDiagram
+content: |
+  FLOOR ||--|{ AREA : contains
+  AREA ||--o{ DEVICE : holds
+  DEVICE ||--|{ ENTITY : provides
+  AREA ||--o{ ENTITY : holds
+  FLOOR {
+    int count "{{ floors() | count }}"
+  }
+  AREA {
+    int count "{{ areas() | count }}"
+  }
+  DEVICE {
+    int count "{{ states | map(attribute='entity_id') | map('device_id') | reject('none') | unique | list | count }}"
+  }
+  ENTITY {
+    int count "{{ states | count }}"
+    int unavailable "{{ states | selectattr('state', 'in', ['unavailable', 'unknown']) | list | count }}"
+  }
+```
+
+### Gantt chart
+```yaml
+type: custom:mermaid-card
+title: Gantt chart
+diagram_type: gantt
+content: |
+  {%- macro t(a, f='%H:%M') %}{{ as_local(as_datetime(state_attr('sun.sun', a))).strftime(f) }}{% endmacro %}
+    dateFormat HH:mm
+    axisFormat %H:%M
+    todayMarker off
+    section Sun
+    Night :00:00, {{ t('next_dawn') }}
+    Twilight :{{ t('next_dawn') }}, {{ t('next_rising') }}
+    Daylight :active, {{ t('next_rising') }}, {{ t('next_setting') }}
+    Twilight :{{ t('next_setting') }}, {{ t('next_dusk') }}
+    Night :{{ t('next_dusk') }}, 23:59
+    Now :milestone, {{ now().strftime('%H:%M') }}, 0m
+    section Running
+  {%- for e in states.input_boolean | selectattr('state', 'eq', 'on') %}
+    {{ e.name | replace(':', ' ') }} :{{ as_local(e.last_changed).strftime('%H:%M') }}, {{ [1, ((now() - e.last_changed).total_seconds() / 60) | round(0, 'ceil') | int] | max }}m
+  {%- endfor %}
+```
+
+### Timeline
+```yaml
+type: custom:mermaid-card
+title: Timeline
+diagram_type: timeline
+content: |
+  {%- macro t(a, f='%H:%M') %}{{ as_local(as_datetime(state_attr('sun.sun', a))).strftime(f) }}{% endmacro %}
+  {%- set ns = namespace(items=[(now().strftime('%H.%M'), 'Now, sun at ' ~ (state_attr('sun.sun', 'elevation') | round(0)) ~ '°')]) %}
+  {%- for a, label in [('next_dawn', 'Dawn'), ('next_rising', 'Sunrise'), ('next_noon', 'Noon'), ('next_setting', 'Sunset'), ('next_dusk', 'Dusk')] %}
+  {%- set ns.items = ns.items + [(t(a, '%H.%M'), label)] %}
+  {%- endfor %}
+    title The sun today
+  {%- for time, label in ns.items | sort(attribute='0') %}
+    {{ time }} : {{ label }}
+  {%- endfor %}
+```
+
+### User journey
+```yaml
+type: custom:mermaid-card
+title: User journey
+diagram_type: journey
+content: |
+  {%- macro comfort(entity) %}{{ [1, 5 - ((states(entity) | float(21) - 21) | abs | round(0) | int)] | max }}{% endmacro %}
+  {%- set elevation = state_attr('sun.sun', 'elevation') | float(0) %}
+    title A day at home
+    section Morning
+      Wake up at {{ states('input_number.bedroom_temperature') }} °C: {{ comfort('input_number.bedroom_temperature') }}: Bedroom
+      Breakfast at {{ states('input_number.kitchen_temperature') }} °C: {{ comfort('input_number.kitchen_temperature') }}: Kitchen
+    section Daytime
+      Daylight, sun at {{ elevation | round(0) }}°: {{ 5 if elevation > 20 else 3 if elevation > 0 else 1 }}: Sun
+      Robot vacuum {{ states('input_select.robot_vacuum') | lower }}: {{ 1 if is_state('input_select.robot_vacuum', 'Error') else 4 }}: Home Assistant
+    section Evening
+      Living room at {{ states('input_number.living_room_temperature') }} °C: {{ comfort('input_number.living_room_temperature') }}: Living room
+      Evening scene {{ states('input_boolean.evening_scene') }}: {{ 5 if is_state('input_boolean.evening_scene', 'on') else 2 }}: Home Assistant
+```
+
