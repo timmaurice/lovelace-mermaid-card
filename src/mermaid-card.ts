@@ -408,6 +408,8 @@ export class MermaidCard extends LitElement {
       pieSectionTextColor: '#ffffff',
       pieTitleTextColor: read('--primary-text-color'),
       pieLegendTextColor: read('--primary-text-color'),
+      pieOpacity: '1', // Mermaid's 0.7 lets the card show through: slices no longer match their legend
+      archGroupBorderColor: read('--secondary-text-color'), // Mermaid's black vanishes on a dark card
     };
     // Pie slices, mind map branches and timeline sections each take a colour of their own. Mermaid
     // derives them from primaryColor, which a card background makes near black; HA's palette instead.
@@ -424,7 +426,9 @@ export class MermaidCard extends LitElement {
       vars[`fillType${index}`] = color; // user journey sections
     });
     const xyChart = { plotColorPalette: colors.join(',') }; // its own default is pale pastels
-    return { ...Object.fromEntries(Object.entries(vars).filter(([, value]) => value)), xyChart };
+    // Its rings are light grey on any card, glaring on a dark one; a faint text colour suits both.
+    const radar = { graticuleColor: read('--secondary-text-color'), graticuleOpacity: '0.1' };
+    return { ...Object.fromEntries(Object.entries(vars).filter(([, value]) => value)), xyChart, radar };
   }
 
   protected render() {

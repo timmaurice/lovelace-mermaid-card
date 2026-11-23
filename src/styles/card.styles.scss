@@ -71,6 +71,13 @@ dialog::backdrop {
 svg[aria-roledescription='sankey'] .link {
   mix-blend-mode: normal !important;
 }
+/* A timeline draws its axis and guides in the label colour of its sections, white on white */
+svg[aria-roledescription='timeline'] .lineWrapper line {
+  stroke: var(--secondary-text-color) !important;
+}
+svg[aria-roledescription='timeline'] marker path {
+  fill: var(--secondary-text-color) !important;
+}
 /* What Mermaid draws over a Gantt task, a pie slice or a sankey label must not swallow its tap */
 .taskText,
 text.slice,

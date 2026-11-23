@@ -309,6 +309,9 @@ describe('MermaidCard', () => {
     expect(vars.fillType1).toBe('#ff6f22');
     expect([vars.pie9, vars.cScale11]).toEqual(['#2196f3', '#926bc7']); // past the palette, it starts over
     expect(vars.xyChart).toEqual({ plotColorPalette: expect.stringMatching(/^#2196f3,#ff6f22,/) });
+    // Opaque pie slices match their legend; radar rings stay faint on a dark card.
+    expect(vars.pieOpacity).toBe('1');
+    expect(vars.radar).toMatchObject({ graticuleOpacity: '0.1' });
   });
 
   it('tells Mermaid’s theme about dark mode, where it reads it', async () => {
