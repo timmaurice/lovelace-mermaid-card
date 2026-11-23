@@ -136,16 +136,16 @@ export const EXAMPLES: Record<(typeof DIAGRAM_TYPES)[number], string> = {
   AREA ||--o{ ENTITY : contains
   ENTITY ||--o{ AUTOMATION : triggers
   FLOOR {
-    int count "{{ floors() | count }} here"
+    int count "{{ floors() | count }}"
   }
   AREA {
-    int count "{{ areas() | count }} here"
+    int count "{{ areas() | count }}"
   }
   ENTITY {
-    int count "{{ states | count }} here"
+    int count "{{ states | count }}"
   }
   AUTOMATION {
-    int count "{{ states.automation | count }} here"
+    int count "{{ states.automation | count }}"
   }`,
   gantt: `  dateFormat HH:mm
   axisFormat %H:%M
