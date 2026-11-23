@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 120 120">
+  <!-- Source of icon.png: rsvg-convert -w 1024 -h 1024 icon.svg -o icon.png -->
+    <rect width="120" height="120" rx="28" fill="#2f7fd6"/>
+    <!-- A roof of flowchart nodes over dashed walls, flowing down into the Mermaid logo -->
+    <polyline points="20,58 60,24 100,58" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+    <g stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-dasharray="6 6">
+      <line x1="20" y1="70" x2="20" y2="98"/>
+      <line x1="100" y1="70" x2="100" y2="98"/>
+    </g>
+    <circle cx="20" cy="58" r="8" fill="#fff"/>
+    <circle cx="100" cy="58" r="8" fill="#fff"/>
+    <circle cx="60" cy="24" r="9" fill="#fff"/>
+    <line x1="60" y1="34" x2="60" y2="53" stroke="#fff" stroke-width="4"/>
+    <polygon points="54,52 66,52 60,62" fill="#fff"/>
+    <!-- Mermaid logo, MIT licensed, © Knut Sveidqvist -->
+    <svg x="40" y="63" width="40" height="40" viewBox="0 0 491 491">
+      <path d="M490.16,84.61C490.16,37.912 452.248,0 405.55,0L84.61,0C37.912,0 0,37.912 0,84.61L0,405.55C0,452.248 37.912,490.16 84.61,490.16L405.55,490.16C452.248,490.16 490.16,452.248 490.16,405.55L490.16,84.61Z" fill="#ff3670"/>
+      <path d="M407.48,111.18C335.587,108.103 269.573,152.338 245.08,220C220.587,152.338 154.573,108.103 82.68,111.18C80.285,168.229 107.577,222.632 154.74,254.82C178.908,271.419 193.35,298.951 193.27,328.27L193.27,379.13L296.9,379.13L296.9,328.27C296.816,298.953 311.255,271.42 335.42,254.82C382.596,222.644 409.892,168.233 407.48,111.18Z" fill="#fff"/>
+    </svg>
+</svg>
