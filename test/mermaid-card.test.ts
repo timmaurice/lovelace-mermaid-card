@@ -3,7 +3,7 @@ import { bindNodes, edgeDuration, isActive, stateColor } from '../src/entities';
 import { TEMPLATE, type HassEntity, type HomeAssistant, type MermaidCardConfig } from '../src/types';
 
 const render = vi.fn(async () => ({
-  svg: '<svg><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g><g class="node" id="mermaid-card-1-flowchart-B-0"><rect></rect></g></svg>',
+  svg: '<svg><g class="node" data-id="A"><rect></rect></g><g class="node" data-id="B"><rect></rect></g></svg>',
 }));
 const initialize = vi.fn();
 vi.mock('../src/mermaid', () => ({
@@ -61,11 +61,16 @@ describe('stateColor', () => {
   });
 });
 
+// Fixtures in Mermaid 13's shape: `data-id` on nodes, an edge a group of its line and arrowhead.
+const edge = (id: string, cls = '') =>
+  `<g class="edge ${cls}" data-id="${id}"><path></path><path class="marker"></path></g>`;
+const edges = (...items: string[]) => `<g class="edgePaths">${items.join('')}</g>`;
+
 describe('bindNodes', () => {
   it('colours bound nodes, leaves others alone and opens more-info on click and Enter', () => {
     const root = document.createElement('div');
     root.innerHTML =
-      '<svg><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g><g class="node" id="mermaid-card-1-flowchart-B-0"><rect></rect></g></svg>';
+      '<svg><g class="node" data-id="A"><rect></rect></g><g class="node" data-id="B"><rect></rect></g></svg>';
     const onTap = vi.fn();
     bindNodes(root, { A: 'light.a' }, { 'light.a': entity('light.a', 'on') }, onTap);
 
@@ -82,9 +87,10 @@ describe('bindNodes', () => {
   it('lights only the node whose active_when matches, when several share one entity', () => {
     const root = document.createElement('div');
     root.innerHTML =
-      '<svg><g class="node" id="mermaid-card-1-state-Cleaning-0"><rect></rect></g>' +
-      '<g class="node" id="mermaid-card-1-state-Docked-0"><rect></rect></g>' +
-      '<path data-id="e1"></path></svg>';
+      '<svg><g class="node" data-id="Cleaning"><rect></rect></g>' +
+      '<g class="node" data-id="Docked"><rect></rect></g>' +
+      edges(edge('e1')) +
+      '</svg>';
     const vacuum = 'input_select.robot_vacuum';
     bindNodes(
       root,
@@ -99,31 +105,32 @@ describe('bindNodes', () => {
     const [cleaning, docked] = root.querySelectorAll('rect');
     expect(cleaning.style.getPropertyValue('stroke')).toContain('--state-input_select-inactive-color');
     expect(docked.style.getPropertyValue('stroke')).toContain('--state-input_select-active-color');
-    expect(root.querySelector('path')!.classList.contains('edge-animation-fast')).toBe(false);
+    expect(root.querySelector('.edge')!.classList.contains('edge-animation-fast')).toBe(false);
   });
 
   it('binds an icon shape and draws its icon in the state colour', () => {
     const root = document.createElement('div');
     root.innerHTML =
-      '<svg><g class="icon-shape default" id="mermaid-card-1-flowchart-HP-0"><g class="label"><rect></rect></g><g style="color: #009ac7"><path></path></g></g></svg>';
+      '<svg><g class="node default" data-id="HP"><g><g color="#009ac7"><path></path></g></g><text>Heat pump</text></g></svg>';
     const onAction = vi.fn();
     bindNodes(root, { HP: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'on') }, onAction);
-    const node = root.querySelector<SVGGElement>('.icon-shape')!;
-    const icon = node.querySelector<SVGGElement>('g[style]')!;
+    const node = root.querySelector<SVGGElement>('.node')!;
+    const icon = node.querySelector<SVGGElement>('g[color]')!;
     expect(icon.style.color).toContain('--state-switch-active-color');
-    expect(node.querySelector('rect')!.getAttribute('style')).toBeNull(); // the label box keeps its look
+    expect(icon.querySelector('path')!.getAttribute('style')).toBeNull(); // the glyph is not a body to tint
     node.dispatchEvent(new MouseEvent('click'));
     expect(onAction).toHaveBeenCalledWith({ entity: 'switch.pump' }, 'tap');
     bindNodes(root, { HP: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'unknown_state_x') }, onAction);
     expect(icon.style.color).toContain('--state-switch-active-color'); // any other text counts as active
     bindNodes(root, { HP: 'switch.pump' }, { 'switch.pump': entity('switch.pump', '21.5') }, onAction);
-    expect(icon.style.color).toBe('rgb(0, 154, 199)'); // a number keeps the diagram's own colour
+    expect(icon.style.color).toBe(''); // a number keeps the diagram's own colour, the attribute
+    expect(icon.getAttribute('color')).toBe('#009ac7');
   });
 
   it('runs the hold action on a long press instead of the tap', () => {
     vi.useFakeTimers();
     const root = document.createElement('div');
-    root.innerHTML = '<svg><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g></svg>';
+    root.innerHTML = '<svg><g class="node" data-id="A"><rect></rect></g></svg>';
     const onAction = vi.fn();
     const binding = { entity: 'light.a', hold_action: { action: 'toggle' } };
     bindNodes(root, { A: binding }, {}, onAction);
@@ -136,30 +143,35 @@ describe('bindNodes', () => {
     expect(onAction.mock.calls).toEqual([[binding, 'hold']]);
   });
 
-  it('binds a Gantt task by its id and a mind map node by its label, not by its position', () => {
+  it('binds Gantt tasks and kanban items by id, a mind map node by its label', () => {
     const root = document.createElement('div');
     root.innerHTML =
-      '<svg id="r1"><rect class="task" id="r1-wash"></rect>' +
-      '<g class="node mindmap-node" id="r1-node_1"><rect></rect><foreignObject><div>Lamp<br>hall</div></foreignObject></g></svg>';
+      '<svg><rect class="task" data-id="wash"></rect><text class="taskText" data-id="wash">Wash</text>' +
+      '<g class="node" data-id="n:card1"><rect></rect></g>' +
+      '<g class="mindmap-node" data-id="n:hall"><rect></rect><line class="node-line-0"></line><text><tspan>Lamp</tspan><tspan>hall</tspan></text></g></svg>';
     const states = { 'light.a': entity('light.a', 'on') };
     const mindmapNode = root.querySelector<SVGElement>('.mindmap-node')!;
-    bindNodes(root, { node_1: 'light.a' }, states, vi.fn());
+    bindNodes(root, { hall: 'light.a' }, states, vi.fn());
     expect(mindmapNode.getAttribute('role')).toBeNull();
-    bindNodes(root, { wash: 'light.a', 'Lamp hall': 'light.a' }, states, vi.fn());
+    bindNodes(root, { wash: 'light.a', card1: 'light.a', 'Lamp hall': 'light.a' }, states, vi.fn());
     expect(root.querySelector<SVGElement>('rect.task')!.style.getPropertyValue('fill')).toContain('--state-light');
+    expect(root.querySelector('.taskText')!.getAttribute('role')).toBeNull(); // its text lets taps through
+    expect(root.querySelector<SVGElement>('.node rect')!.style.getPropertyValue('fill')).toContain('--state-light');
     expect(mindmapNode.querySelector('rect')!.style.getPropertyValue('fill')).toContain('--state-light');
+    expect(mindmapNode.querySelector('line')!.style.getPropertyValue('stroke')).toContain('--state-light'); // its underline
+    expect(mindmapNode.querySelector('text')!.style.getPropertyValue('fill')).toBe('var(--primary-text-color)');
     expect(mindmapNode.getAttribute('role')).toBe('button');
   });
 
-  it('pairs pie slices with their legend entry, past entries Mermaid drew no slice for', () => {
+  it('binds a pie slice with its legend entry, and a legend entry Mermaid drew no slice for', () => {
     const root = document.createElement('div');
-    const legend = (label: string, color: string) =>
-      `<g class="legend"><rect style="fill: ${color}"></rect><text>${label}</text></g>`;
+    const legend = (label: string) =>
+      `<g class="legend" data-id="slice:${label}"><rect></rect><text>${label}</text></g>`;
     root.innerHTML =
-      '<svg><path class="pieCircle" fill="#ff0000"></path><path class="pieCircle" fill="#0000ff"></path>' +
-      legend('Washer [30]', 'rgb(255, 0, 0)') +
-      legend('Tiny [0.1]', 'rgb(0, 255, 0)') +
-      legend('Dryer [70]', 'rgb(0, 0, 255)') +
+      '<svg aria-roledescription="pie"><path class="pieCircle" data-id="slice:Washer"></path><path class="pieCircle" data-id="slice:Dryer"></path>' +
+      legend('Washer') +
+      legend('Tiny') +
+      legend('Dryer') +
       '</svg>';
     const onAction = vi.fn();
     bindNodes(root, { Dryer: 'light.a', Tiny: 'light.b' }, {}, onAction);
@@ -171,31 +183,19 @@ describe('bindNodes', () => {
     expect(root.querySelectorAll('.legend')[1].getAttribute('role')).toBe('button'); // Tiny: legend only
   });
 
-  it('keeps the speed or classDef animation the diagram gives an edge, on only while active', () => {
+  it('keeps the speed the diagram gives an edge, on only while active', () => {
     const root = document.createElement('div');
-    root.innerHTML =
-      '<svg><path data-id="slow" class="edge-animation-slow"></path>' +
-      '<path data-id="own" style="animation: dash 25s linear infinite"></path></svg>';
-    const [slow, own] = root.querySelectorAll<SVGPathElement>('path');
+    root.innerHTML = `<svg>${edges(edge('slow', 'edge-animation-slow'), edge('plain'))}</svg>`;
+    const [slow, plain] = root.querySelectorAll<SVGElement>('.edge');
     const bind = (state: string) =>
-      bindNodes(root, { slow: 'switch.p', own: 'switch.p' }, { 'switch.p': entity('switch.p', state) }, vi.fn());
+      bindNodes(root, { slow: 'switch.p', plain: 'switch.p' }, { 'switch.p': entity('switch.p', state) }, vi.fn());
 
     bind('off');
-    expect(slow.getAttribute('class')).toBe('');
-    expect(own.style.animation).toBe('none');
+    expect(slow.classList.contains('edge-animation-slow')).toBe(false);
     bind('on');
-    expect(slow.getAttribute('class')).toBe('edge-animation-slow');
-    expect(own.style.animation).toMatch(/\bdash\b/); // the classDef's own animation again
-  });
-
-  it('starts a bound edge’s dashes where they can move, and puts it back when off', () => {
-    const root = document.createElement('div');
-    root.innerHTML = '<svg><path data-id="e1" style="stroke-dashoffset: 0"></path></svg>'; // as Mermaid draws it
-    const edge = root.querySelector('path')!;
-    bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'on') }, vi.fn());
-    expect(edge.style.strokeDashoffset).toBe('900px');
-    bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'off') }, vi.fn());
-    expect(edge.style.strokeDashoffset).toBe('0');
+    expect(slow.classList.contains('edge-animation-slow')).toBe(true);
+    expect(slow.classList.contains('edge-animation-fast')).toBe(false);
+    expect(plain.classList.contains('edge-animation-fast')).toBe(true);
   });
 
   it('maps a value to a duration by its square root, from slow near zero to fast at max', () => {
@@ -210,51 +210,47 @@ describe('bindNodes', () => {
     expect(edgeDuration(650, 4000) / edgeDuration(3200, 4000)).toBeGreaterThan(1.8);
   });
 
-  it('sets duration and direction inline for speed: auto, and only there', () => {
+  it('sets duration and direction inline on the line for speed: auto, and only there', () => {
     const root = document.createElement('div');
-    root.innerHTML =
-      '<svg><path data-id="pv" style="stroke-dashoffset: 0"></path><path data-id="plain"></path>' +
-      '<path data-id="own" style="animation: dash 25s linear infinite"></path></svg>';
-    const [pv, plain, own] = root.querySelectorAll<SVGPathElement>('path');
+    root.innerHTML = `<svg>${edges(edge('pv'), edge('plain'))}</svg>`;
+    const [pv, plain] = root.querySelectorAll<SVGElement>('.edge');
+    const line = (group: SVGElement) => group.querySelector<SVGElement>('path:not(.marker)')!;
     const bind = (state: string) =>
       bindNodes(
         root,
-        { pv: { entity: 'sensor.grid', speed: 'auto', max: 5000 }, plain: 'sensor.grid', own: 'sensor.grid' },
+        { pv: { entity: 'sensor.grid', speed: 'auto', max: 5000 }, plain: 'sensor.grid' },
         { 'sensor.grid': entity('sensor.grid', state) },
         vi.fn(),
       );
 
     bind('5000');
-    expect(pv.style.animationDuration).toBe('5s');
-    expect(pv.style.animationDirection).toBe('');
-    expect(pv.classList.contains('edge-animation-fast')).toBe(true); // dash pattern and keyframes stay Mermaid's
-    expect(plain.style.animationDuration).toBe('');
-    expect(own.style.animation).toMatch(/\b25s\b/); // a classDef's own speed is untouched
+    expect(line(pv).style.animationDuration).toBe('5s');
+    expect(line(pv).style.animationDirection).toBe('');
+    expect(pv.classList.contains('edge-animation-fast')).toBe(true); // dash pattern and keyframes stay the card's
+    expect(line(plain).style.animationDuration).toBe('');
     bind('-5000'); // export: the other way round
-    expect(pv.style.animationDirection).toBe('reverse');
+    expect(line(pv).style.animationDirection).toBe('reverse');
     bind('0');
-    expect(pv.style.animationDuration).toBe('');
-    expect(pv.style.animationDirection).toBe('');
+    expect(line(pv).style.animationDuration).toBe('');
+    expect(line(pv).style.animationDirection).toBe('');
     expect(pv.classList.contains('edge-animation-fast')).toBe(false);
   });
 
-  it('animates a bound edge while its entity is active', () => {
+  it('animates and colours a bound edge and its arrowhead while its entity is active', () => {
     const root = document.createElement('div');
-    root.innerHTML =
-      '<svg><marker id="m"><path></path></marker><path data-id="e1" marker-end="url(#m)"></path><g data-id="e1"></g></svg>';
-    const edge = root.querySelector<SVGPathElement>('path[data-id]')!;
+    // The label shares the edge's id; only the edge in edgePaths is the edge.
+    root.innerHTML = `<svg>${edges(edge('e1'))}<g class="edgeLabels"><g class="edgeLabel" data-id="e1"></g></g></svg>`;
+    const group = root.querySelector<SVGElement>('.edge')!;
+    const [line, marker] = group.querySelectorAll<SVGElement>('path');
     bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'on') }, vi.fn());
-    expect(edge.classList.contains('edge-animation-fast')).toBe(true);
-    expect(edge.style.getPropertyValue('stroke')).toContain('--state-switch-active-color');
-    // The arrowhead takes the colour too, from a copy: the shared marker stays as Mermaid drew it.
-    const copy = root.querySelector<SVGMarkerElement>(`[id="${edge.getAttribute('marker-end')!.slice(5, -1)}"]`)!;
-    expect(copy.id).not.toBe('m');
-    expect(copy.querySelector('path')!.style.getPropertyValue('fill')).toContain('--state-switch-active-color');
-    expect(root.querySelector('#m path')!.getAttribute('style')).toBeNull();
+    expect(group.classList.contains('edge-animation-fast')).toBe(true);
+    expect(line.style.getPropertyValue('stroke')).toContain('--state-switch-active-color');
+    expect(marker.style.getPropertyValue('fill')).toContain('--state-switch-active-color');
+    expect(root.querySelector('.edgeLabel')!.getAttribute('class')).toBe('edgeLabel');
     bindNodes(root, { e1: 'switch.pump' }, { 'switch.pump': entity('switch.pump', 'off') }, vi.fn());
-    expect(edge.classList.contains('edge-animation-fast')).toBe(false);
-    expect(edge.style.getPropertyValue('stroke')).toBe('');
-    expect(edge.getAttribute('marker-end')).toBe('url(#m)');
+    expect(group.classList.contains('edge-animation-fast')).toBe(false);
+    expect(line.style.getPropertyValue('stroke')).toBe('');
+    expect(marker.style.getPropertyValue('fill')).toBe('');
   });
 });
 
@@ -290,7 +286,7 @@ describe('MermaidCard', () => {
 
     expect(subscribe).not.toHaveBeenCalled();
     expect(render).toHaveBeenLastCalledWith(expect.any(String), 'flowchart LR\n A --> B');
-    const rect = () => card.shadowRoot!.querySelector<SVGRectElement>('[id$="-flowchart-A-0"] rect')!;
+    const rect = () => card.shadowRoot!.querySelector<SVGRectElement>('[data-id="A"] rect')!;
     expect(rect().style.getPropertyValue('fill')).toContain('inactive');
 
     // A state change recolours without rendering the diagram again.

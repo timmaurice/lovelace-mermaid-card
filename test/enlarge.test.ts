@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { HassEntity, HomeAssistant } from '../src/types';
 
 const render = vi.fn(async () => ({
-  svg: '<svg viewBox="0 0 800 200"><g class="node" id="mermaid-card-1-flowchart-A-0"><rect></rect></g></svg>',
+  svg: '<svg viewBox="0 0 800 200"><g class="node" data-id="A"><rect></rect></g></svg>',
 }));
 vi.mock('../src/mermaid', () => ({
   loadMermaid: async () => ({ initialize: vi.fn(), render }),

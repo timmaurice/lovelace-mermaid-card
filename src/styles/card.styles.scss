@@ -75,7 +75,7 @@ svg[aria-roledescription='sankey'] .link {
 svg[aria-roledescription='timeline'] .lineWrapper line {
   stroke: var(--secondary-text-color) !important;
 }
-svg[aria-roledescription='timeline'] marker path {
+svg[aria-roledescription='timeline'] .arrowhead {
   fill: var(--secondary-text-color) !important;
 }
 /* What Mermaid draws over a Gantt task, a pie slice or a sankey label must not swallow its tap */
@@ -83,6 +83,22 @@ svg[aria-roledescription='timeline'] marker path {
 text.slice,
 svg[aria-roledescription='sankey'] .links {
   pointer-events: none;
+}
+/* Mermaid 13 marks moving edges with these classes but ships no styles for them: 12's, on the line only */
+.edge-animation-fast > path:not(.marker),
+.edge-animation-slow > path:not(.marker) {
+  stroke-dasharray: 9, 5;
+  stroke-dashoffset: 900;
+  stroke-linecap: round;
+  animation: dash 50s linear infinite;
+}
+.edge-animation-fast > path:not(.marker) {
+  animation-duration: 20s;
+}
+@keyframes dash {
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   /* Every animation, also a classDef's own, which sits inline on the edge */

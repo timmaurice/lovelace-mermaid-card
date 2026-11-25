@@ -72,14 +72,20 @@ test('draws an automation with the path of its last run, and follows the next ru
   const card = page.locator('mermaid-card');
   const ran = () =>
     card.evaluate((c) =>
-      [...c.shadowRoot!.querySelectorAll('.diagram .node.ran')].map((n) => n.textContent?.trim() ?? ''),
+      // A wrapped label is one tspan per line: read the lines with a space between them.
+      [...c.shadowRoot!.querySelectorAll('.diagram .node.ran')].map((n) =>
+        [...n.querySelectorAll('tspan, text:not(:has(tspan))')]
+          .map((t) => t.textContent)
+          .join(' ')
+          .trim(),
+      ),
     );
 
   await expect.poll(ran, { timeout: 30_000 }).toContain('Announce open');
   expect(await ran()).toEqual(expect.arrayContaining(['E2E door flow', 'Door changed', 'E2E away is off']));
   expect(await ran()).not.toContain('Announce closed');
   expect(await ran()).not.toContain('Announce other');
-  expect(await card.locator('.diagram path.edge-animation-slow').count()).toBeGreaterThan(0);
+  expect(await card.locator('.diagram .edge-animation-slow').count()).toBeGreaterThan(0);
   await expect(card.locator('ha-alert')).toHaveCount(0);
 
   // The next run redraws the path: now through the other branch.
@@ -88,7 +94,7 @@ test('draws an automation with the path of its last run, and follows the next ru
   expect(await ran()).not.toContain('Announce open');
 
   // The start node is bound to the automation: a tap opens its details.
-  await card.locator('.node[id*="-flowchart-start-"]').click();
+  await card.locator('.node[data-id="start"]').click();
   await expect(page.locator('ha-more-info-dialog')).toContainText('E2E door flow');
   expect(consoleErrors).toEqual([]);
 });

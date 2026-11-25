@@ -7,6 +7,8 @@ import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import json from '@rollup/plugin-json';
+import commonjs from '@rollup/plugin-commonjs';
+import { rollup } from 'rollup';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const dev = process.env.ROLLUP_WATCH === 'true';
@@ -28,20 +30,57 @@ function logCardInfo() {
 }
 
 // Home Assistant loads every dashboard resource on every dashboard, and HACS ships a card as one
-// file. Mermaid's self-contained build is ~5.5 MB of code; parsing and running it on each page
-// load would slow down dashboards that never show a diagram. So it travels inside the card as a
-// string — cheap to parse — and is only executed when the first diagram renders (see mermaid.ts).
-const MERMAID_BUILD = 'node_modules/mermaid/dist/mermaid.min.js';
+// file. Mermaid's code is megabytes; parsing and running it on each page load would slow down
+// dashboards that never show a diagram. So it travels inside the card as a string — cheap to
+// parse — and is only executed when the first diagram renders (see mermaid.ts).
+// Mermaid 13 ships as an ESM entry plus per-diagram chunks that import each other, and no longer
+// bundles ELK. A nested Rollup pass flattens Mermaid and ELK into one classic script that sets
+// `globalThis.mermaid`, the shape the 12 IIFE had.
 const MERMAID_SOURCE_ID = 'virtual:mermaid-source';
+const MERMAID_ENTRY_ID = '\0mermaid-entry';
+const MERMAID_ENTRY = `import mermaid from 'mermaid';
+import elkLayouts from '@mermaid-js/layout-elk';
+import { icons } from '@mermaid-js/plugin-icons';
+mermaid.registerLayoutLoaders(elkLayouts);
+// Without this extension 13 draws every registered icon as its "?" placeholder. Not awaited: it
+// settles in microtasks, before the script's onload hands Mermaid to the card.
+mermaid.registerExternalDiagrams([icons]);
+export default mermaid;`;
+
+async function buildMermaid() {
+  const bundle = await rollup({
+    input: MERMAID_ENTRY_ID,
+    onwarn: (warning, warn) => !['CIRCULAR_DEPENDENCY', 'THIS_IS_UNDEFINED'].includes(warning.code) && warn(warning),
+    plugins: [
+      {
+        name: 'mermaid-entry',
+        resolveId: (id) => (id === MERMAID_ENTRY_ID ? id : null),
+        load: (id) => (id === MERMAID_ENTRY_ID ? MERMAID_ENTRY : null),
+      },
+      nodeResolve({ browser: true }),
+      commonjs(), // elkjs
+    ],
+  });
+  const { output } = await bundle.generate({
+    format: 'iife',
+    name: 'mermaid',
+    exports: 'default',
+    inlineDynamicImports: true,
+    plugins: [terser({ format: { comments: false } })],
+  });
+  await bundle.close();
+  return { code: output[0].code, files: bundle.watchFiles };
+}
 
 function mermaidSourcePlugin() {
   return {
     name: 'mermaid-source',
     resolveId: (id) => (id === MERMAID_SOURCE_ID ? `\0${MERMAID_SOURCE_ID}` : null),
-    load(id) {
+    async load(id) {
       if (id !== `\0${MERMAID_SOURCE_ID}`) return null;
-      this.addWatchFile(MERMAID_BUILD);
-      return `export default ${JSON.stringify(readFileSync(MERMAID_BUILD, 'utf-8'))};`;
+      const { code, files } = await buildMermaid();
+      files.forEach((file) => this.addWatchFile(file));
+      return `export default ${JSON.stringify(code)};`;
     },
   };
 }

@@ -60,7 +60,7 @@ test('binds Gantt tasks and kanban items by id, mind maps, pies and sankeys by l
     pie.locator('.pieCircle').nth(1), // the second drawn slice is Dryer, the third legend entry
     pie.locator('.legend', { hasText: 'Dryer' }),
     gantt.locator('rect.task'),
-    kanban.locator('.node[id$="-card1"]'),
+    kanban.locator('.node[data-id="n:card1"]'),
     sankey.locator('.node-labels text', { hasText: 'Grid' }),
   ];
   for (const target of targets) {
@@ -78,7 +78,9 @@ test('binds Gantt tasks and kanban items by id, mind maps, pies and sankeys by l
 
   // Nodes take the state colour; chart slices keep theirs.
   await expect.poll(() => fill(gantt.locator('rect.task'))).toContain('--state-light-active-color');
-  await expect.poll(() => fill(kanban.locator('.node[id$="-card1"] > rect'))).toContain('--state-light-active-color');
+  await expect
+    .poll(() => fill(kanban.locator('.node[data-id="n:card1"] > rect')))
+    .toContain('--state-light-active-color');
   await expect
     .poll(() => fill(mindmap.locator('.mindmap-node', { hasText: 'Lamp (hall)' }).locator('rect, path').first()))
     .toContain('--state-light-active-color');
@@ -86,9 +88,9 @@ test('binds Gantt tasks and kanban items by id, mind maps, pies and sankeys by l
   expect(
     await mindmap
       .locator('.mindmap-node', { hasText: 'Lamp (hall)' })
-      .locator('span')
+      .locator('text')
       .first()
-      .evaluate((span) => span.style.getPropertyValue('color')),
+      .evaluate((text) => text.style.getPropertyValue('fill')),
   ).toBe('var(--primary-text-color)');
   expect(await fill(pie.locator('.pieCircle').nth(1))).toBe('');
   expect(consoleErrors).toEqual([]);

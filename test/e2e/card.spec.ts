@@ -43,10 +43,10 @@ test.afterAll(async () => {
 test('renders live template values and follows the bound entity', async ({ page, consoleErrors }) => {
   await page.goto(`/${urlPath}/0`);
   const card = page.locator('mermaid-card');
-  const pump = card.locator('.node[id*="-flowchart-HP-"]');
-  const boiler = card.locator('.node[id*="-flowchart-BOIL-"]');
+  const pump = card.locator('.node[data-id="HP"]');
+  const boiler = card.locator('.node[data-id="BOIL"]');
   // Edges are found by Mermaid's data-id; a Mermaid update that moves it must fail here.
-  const flow = card.locator('path[data-id="L_HP_BOIL_0"]');
+  const flow = card.locator('.edgePaths > [data-id="L_HP_BOIL_0"]');
   const pumpFill = () =>
     pump
       .locator('path, rect, polygon')
@@ -63,7 +63,7 @@ test('renders live template values and follows the bound entity', async ({ page,
   await expect.poll(pumpFill).toContain('--state-switch-active-color');
   await expect(flow).toHaveClass(/edge-animation-fast/);
   // Dashed is not enough: the dashes must move along the edge.
-  const offset = () => flow.evaluate((path) => getComputedStyle(path).strokeDashoffset);
+  const offset = () => flow.locator('path:not(.marker)').evaluate((path) => getComputedStyle(path).strokeDashoffset);
   const before = await offset();
   await expect.poll(offset).not.toBe(before);
 

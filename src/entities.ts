@@ -37,8 +37,8 @@ export const toBinding = (value: string | NodeBinding): NodeBinding =>
   typeof value === 'string' ? { entity: value } : value;
 
 /**
- * Seconds one run of Mermaid's dash keyframes takes for a `speed: auto` edge: from 50 s (Mermaid's
- * slow) for a value near zero to 5 s at `max`. The value goes in as its square root: a quarter of
+ * Seconds one run of the dash keyframes takes for a `speed: auto` edge: from 50 s (the
+ * slow speed) for a value near zero to 5 s at `max`. The value goes in as its square root: a quarter of
  * `max` moves half as fast as `max`, and a few watts still visibly move. A log scale made 650 W and
  * 3200 W look the same. The speed in between is linear in that, not the duration.
  */
@@ -50,38 +50,6 @@ export function edgeDuration(value: number, max = 10000): number {
 // A press this long is a hold, Home Assistant's own threshold.
 const HOLD_MS = 500;
 
-/**
- * Points an edge's arrowheads at copies filled with `color`, or back at Mermaid's own without one.
- * Markers are shared by all edges, so a coloured edge needs its own copy, as Mermaid's linkStyle
- * makes one.
- */
-function colorMarkers(edge: SVGPathElement, color?: string): void {
-  const svg = edge.ownerSVGElement;
-  for (const attribute of ['marker-start', 'marker-end']) {
-    const own = edge.getAttribute(`data-own-${attribute}`) ?? edge.getAttribute(attribute);
-    const id = own && /url\(#(.+)\)/.exec(own)?.[1];
-    if (!svg || !own || !id) continue;
-    edge.setAttribute(`data-own-${attribute}`, own);
-    if (!color) {
-      edge.setAttribute(attribute, own);
-      continue;
-    }
-    const copyId = `${id}__${color.replace(/[^\w-]/g, '_')}`;
-    if (!svg.getElementById(copyId)) {
-      const marker = svg.getElementById(id);
-      if (!marker) continue;
-      const copy = marker.cloneNode(true) as SVGElement;
-      copy.id = copyId;
-      for (const shape of copy.querySelectorAll<SVGElement>('path, circle')) {
-        shape.style.setProperty('fill', color, 'important');
-        shape.style.setProperty('stroke', color, 'important');
-      }
-      marker.after(copy);
-    }
-    edge.setAttribute(attribute, `url(#${copyId})`);
-  }
-}
-
 /** Something a binding can attach to: its key, and whether it takes the state colour. */
 interface Target {
   element: SVGElement;
@@ -90,7 +58,7 @@ interface Target {
 }
 
 /** A label as shown: its text, with line breaks and markup read as spaces. */
-function shownText(element: Element | null | undefined): string {
+export function shownText(element: Element | null | undefined): string {
   if (!element) return '';
   const parts: string[] = [];
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
@@ -98,46 +66,31 @@ function shownText(element: Element | null | undefined): string {
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }
 
+// Mermaid prefixes some ids with their kind: kanban and mind map nodes, pie slices, sankey nodes.
+const KIND = /^(?:n|slice|node):/;
+const TARGETS =
+  '.node[data-id], .cluster[data-id], rect.task[data-id], .mindmap-node, .pieCircle[data-id], .legend[data-id], .node-labels > text[data-id]';
+const CHART = '[aria-roledescription="pie"], [aria-roledescription="sankey"]';
+
 /**
- * Everything in the diagram a binding can name. Mermaid gives a node no `data-id`, only a DOM id:
- * `<render id>-flowchart-<node id>-<n>` (`state-…`, `classId-…`), or `<render id>-<id>` for Gantt
- * tasks and kanban items and columns. Mind maps, pies and sankeys keep no ids of their own, so
- * their nodes, slices and legend entries are named by their label.
+ * Everything in the diagram a binding can name. Mermaid 13 puts the id on each node, cluster,
+ * Gantt task, kanban item, pie slice with its legend entry, and sankey node with its label, as
+ * `data-id`. Mind map nodes are named by their label, as the card did before 13.
  */
-function findTargets(root: ParentNode): Target[] {
+export function findTargets(root: ParentNode): Target[] {
   const targets: Target[] = [];
-  for (const element of root.querySelectorAll<SVGElement>('.node, .icon-shape, .cluster, rect.task')) {
-    const svgId = element.ownerSVGElement?.id;
-    const key =
-      /-(?:flowchart|state|classId)-(.+)-\d+$/.exec(element.id)?.[1] ??
-      (element.classList.contains('mindmap-node') ? shownText(element) : undefined) ??
-      (svgId && element.id.startsWith(`${svgId}-`) ? element.id.slice(svgId.length + 1) : undefined);
-    if (key) targets.push({ element, key, tint: true });
-  }
-  // Chart colours carry meaning of their own, so slices and sankey nodes only take actions.
-  for (const svg of root.querySelectorAll('svg')) {
-    const labels = svg.querySelectorAll<SVGElement>(':scope .node-labels > text');
-    svg.querySelectorAll<SVGElement>(':scope .nodes > .node').forEach((node, index) => {
-      const label = labels[index];
-      const key = label?.textContent?.split('\n')[0].trim(); // a second line holds the value
-      if (key) targets.push({ element: node, key, tint: false }, { element: label, key, tint: false });
-    });
-    // Mermaid draws no slice that rounds to 0 %, but keeps its legend entry. Slices follow the
-    // legend's order and colour, so a legend entry whose colour the next slice lacks has none.
-    const slices = [...svg.querySelectorAll<SVGElement>('.pieCircle')];
-    const probe = document.createElement('i');
-    let next = 0;
-    for (const legend of svg.querySelectorAll<SVGElement>('.legend')) {
-      const key = shownText(legend).replace(/ \[[^\]]*\]$/, ''); // `showData` adds ` [value]`
-      if (!key) continue;
-      targets.push({ element: legend, key, tint: false });
-      probe.style.fill = slices[next]?.getAttribute('fill') ?? '';
-      if (probe.style.fill && probe.style.fill === legend.querySelector('rect')?.style.fill)
-        targets.push({ element: slices[next++], key, tint: false });
-    }
+  for (const element of root.querySelectorAll<SVGElement>(TARGETS)) {
+    const key = element.classList.contains('mindmap-node')
+      ? shownText(element)
+      : (element.dataset.id ?? '').replace(KIND, '');
+    // Chart colours carry meaning of their own, so slices and sankey nodes only take actions.
+    if (key) targets.push({ element, key, tint: !element.closest(CHART) });
   }
   return targets;
 }
+
+/** The edges a binding can name: their group, with the line and its arrowheads inside. */
+export const findEdges = (root: ParentNode) => [...root.querySelectorAll<SVGElement>('.edgePaths > [data-id]')];
 
 /** Colours the nodes named in `bindings` after their entity and makes them run their actions. */
 export function bindNodes(
@@ -147,51 +100,45 @@ export function bindNodes(
   onAction: (binding: NodeBinding, action: 'tap' | 'hold') => void,
 ): void {
   const targets = findTargets(root);
-  // Edges carry their id as data-id (clusters do too, but they are not paths).
-  const edges = [...root.querySelectorAll<SVGPathElement>('path[data-id]')];
+  const edges = findEdges(root);
   for (const [nodeId, value] of Object.entries(bindings)) {
     const binding = toBinding(value);
     const entity = states[binding.entity];
     for (const edge of edges.filter((candidate) => candidate.dataset.id === nodeId)) {
+      const line = edge.querySelector<SVGElement>(':scope > path:not(.marker)');
       const color = isActive(entity, binding.active_when)
         ? (stateColor(entity, binding.active_when) ?? 'var(--state-active-color)')
         : undefined;
-      // The entity only turns the animation on and off; how it moves is the diagram's choice:
-      // `animation: slow`, a classDef's own animation (inline on the path), or else fast.
-      const own = (edge.dataset.ownAnimation ??= edge.classList.contains('edge-animation-slow')
-        ? 'slow'
-        : edge.style.animation || 'fast');
+      // The entity only turns the animation on and off; how fast it moves is the diagram's choice
+      // (`animation: slow`), else fast. The card's styles animate these classes.
+      const own = (edge.dataset.ownAnimation ??= edge.classList.contains('edge-animation-slow') ? 'slow' : 'fast');
       edge.classList.toggle('edge-animation-fast', Boolean(color) && own === 'fast');
       edge.classList.toggle('edge-animation-slow', Boolean(color) && own === 'slow');
-      if (own === 'fast' || own === 'slow') {
-        // Mermaid pins an edge it does not animate at offset 0, where the dash keyframes would then
-        // start and end: the line dashed, but standing still. Start where Mermaid's own classes do.
-        const pinned = (edge.dataset.ownDashoffset ??= edge.style.strokeDashoffset);
-        edge.style.strokeDashoffset = color ? '900px' : pinned;
-      } else edge.style.animation = color ? own : 'none'; // which also resets the longhands below
-      // `speed: auto` sets only duration and direction: dash pattern and keyframes stay the diagram's.
+      // `speed: auto` sets only duration and direction: dash pattern and keyframes stay the card's.
       const value = Number(entity?.state);
       const auto = Boolean(color) && binding.speed === 'auto' && Number.isFinite(value);
-      if (auto || own === 'fast' || own === 'slow') {
-        edge.style.animationDuration = auto ? `${edgeDuration(value, binding.max)}s` : '';
-        edge.style.animationDirection = auto && value < 0 ? 'reverse' : ''; // e.g. export to the grid
+      for (const path of [line, ...edge.querySelectorAll<SVGElement>(':scope > path.marker')]) {
+        if (!path) continue;
+        if (color) path.style.setProperty(path === line ? 'stroke' : 'fill', color, 'important');
+        else path.style.removeProperty(path === line ? 'stroke' : 'fill');
       }
-      if (color) edge.style.setProperty('stroke', color, 'important');
-      else edge.style.removeProperty('stroke');
-      colorMarkers(edge, color);
+      if (line) {
+        line.style.animationDuration = auto ? `${edgeDuration(value, binding.max)}s` : '';
+        line.style.animationDirection = auto && value < 0 ? 'reverse' : ''; // e.g. export to the grid
+      }
     }
     for (const { element: node, tint } of targets.filter((target) => target.key === nodeId)) {
       const color = stateColor(entity, binding.active_when);
-      // An icon shape has no body to tint, only its frame and label box: its icon takes the colour below.
+      // An icon shape has no body to tint: its icon takes the colour below.
       // A Gantt task is a bare rect, its own body.
-      const shapes =
-        !tint || node.classList.contains('icon-shape')
-          ? []
-          : node.tagName === 'rect'
-            ? [node]
-            : node.querySelectorAll<SVGElement>(
-                ':scope > rect, :scope > polygon, :scope > circle, :scope > ellipse, :scope > path, :scope > g > path, :scope > g > rect',
-              );
+      const shapes = !tint
+        ? []
+        : node.tagName === 'rect'
+          ? [node]
+          : node.querySelectorAll<SVGElement>(
+              // `line`: a mind map node's underline in its section colour.
+              ':scope > rect, :scope > polygon, :scope > circle, :scope > ellipse, :scope > path, :scope > line, :scope > g > path, :scope > g > rect',
+            );
       for (const shape of shapes) {
         // A tint, not a solid fill: the label keeps the theme's text colour, which a full
         // amber or grey fill made unreadable in dark mode (same idea as the tile card's icon).
@@ -220,8 +167,8 @@ export function bindNodes(
           else label.style.removeProperty(label.tagName === 'text' ? 'fill' : 'color');
         }
       }
-      // An icon draws in currentColor from an inline `color`: it takes the state colour, as a tile card's icon does.
-      for (const icon of node.querySelectorAll<SVGElement>('g[style*="color"]')) {
+      // An icon draws in currentColor from its group's `color`: it takes the state colour, as a tile card's icon does.
+      for (const icon of node.querySelectorAll<SVGElement>('g[color]')) {
         const own = (icon.dataset.ownColor ??= icon.style.color);
         icon.style.color = color ?? own;
       }

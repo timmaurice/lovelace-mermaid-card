@@ -392,6 +392,8 @@ export class MermaidCard extends LitElement {
       background: read('--ha-card-background') || read('--card-background-color'),
       // Edge and icon labels sit on the card; Mermaid would make them black in dark mode.
       edgeLabelBackground: read('--ha-card-background') || read('--card-background-color'),
+      // Mermaid 13 fills ER's hollow "zero" circles with this, white in every theme by default.
+      erMarkerFill: read('--ha-card-background') || read('--card-background-color'),
       primaryColor: read('--secondary-background-color'),
       primaryBorderColor: read('--primary-color'),
       primaryTextColor: read('--primary-text-color'),
